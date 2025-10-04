@@ -1,6 +1,6 @@
 const API_BASE_URL = '/api';
 
-export const getAQICategory = (aqi) => {
+export const getAQICategory = (aqi = 100) => {
   if (aqi <= 50) return { level: 'Good', color: 'green', textColor: 'text-green-800', bgColor: 'bg-green-100' };
   if (aqi <= 100) return { level: 'Moderate', color: 'yellow', textColor: 'text-yellow-800', bgColor: 'bg-yellow-100' };
   if (aqi <= 150) return { level: 'Unhealthy for Sensitive Groups', color: 'orange', textColor: 'text-orange-800', bgColor: 'bg-orange-100' };
@@ -9,7 +9,7 @@ export const getAQICategory = (aqi) => {
   return { level: 'Hazardous', color: 'maroon', textColor: 'text-red-900', bgColor: 'bg-red-200' };
 };
 
-export const getRecommendation = (aqi) => {
+export const getRecommendation = (aqi = 100) => {
   if (aqi <= 50) return "Air quality is excellent! Perfect for outdoor activities.";
   if (aqi <= 100) return "Air quality is acceptable for most people.";
   if (aqi <= 150) return "Sensitive groups should limit outdoor activity.";
