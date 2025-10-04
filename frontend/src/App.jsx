@@ -1,6 +1,8 @@
-import React from 'react'
-import Map from './components/Map'
-import PollutantCard from './PollutantCard'
+import React from 'react';
+import Map from './components/Map';
+import PollutantCard from './PollutantCard';
+import Weather from './Weather';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 function App() {
   return (
