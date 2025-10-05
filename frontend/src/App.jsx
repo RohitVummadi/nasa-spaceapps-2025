@@ -219,6 +219,8 @@ function App() {
   // useRef to store the interval ID so we can clear it later
   const refreshIntervalRef = useRef(null);
   const searchBoxRef = useRef(null);
+  const infoHoverTimeoutRef = useRef(null);
+  const [showPollutantInfo, setShowPollutantInfo] = useState(false);
 
   /**
    * Create a colored marker icon based on AQI category
@@ -761,6 +763,7 @@ function App() {
             center={[userLocation.lat, userLocation.lng]} 
             zoom={13} 
             style={{ height: '100%', width: '100%' }}
+            attributionControl={false}
             className="custom-map-style"
             eventHandlers={{
               click: (e) => {
@@ -975,7 +978,68 @@ function App() {
         zIndex: 1000,
         minWidth: '200px'
       }}>
-        <strong>Pollutant Layers</strong>
+        <div style={{ position: 'relative' }}
+             onMouseEnter={() => {
+               if (infoHoverTimeoutRef.current) clearTimeout(infoHoverTimeoutRef.current);
+               infoHoverTimeoutRef.current = setTimeout(() => setShowPollutantInfo(true), 600);
+             }}
+             onMouseLeave={() => {
+               if (infoHoverTimeoutRef.current) clearTimeout(infoHoverTimeoutRef.current);
+               setShowPollutantInfo(false);
+             }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <strong>Pollutant Layers</strong>
+            <button
+              aria-label="Pollutant info"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowPollutantInfo(!showPollutantInfo);
+              }}
+              style={{
+                background: 'transparent',
+                border: '1px solid #415a77',
+                color: '#e0e1dd',
+                width: '22px',
+                height: '22px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontWeight: 700,
+                lineHeight: 1,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+              }}
+            >i</button>
+          </div>
+
+          {showPollutantInfo && (
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: '100%',
+              transform: 'translate(20px, -200px)',
+              background: '#0d1b2a',
+              color: '#e0e1dd',
+              borderRadius: '8px',
+              padding: '12px',
+              boxShadow: '0 6px 14px rgba(0,0,0,0.35)',
+              width: '280px',
+              zIndex: 2000,
+              border: '1px solid #415a77'
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: '6px' }}>About pollutants</div>
+              <div style={{ fontSize: '0.85rem', lineHeight: 1.4 }}>
+                <div style={{ marginBottom: '6px' }}><strong>PM2.5</strong>: Fine particles (&lt;2.5µm) that reach deep into lungs and bloodstream; linked to heart and lung disease.</div>
+                <div style={{ marginBottom: '6px' }}><strong>PM10</strong>: Coarse particles (&lt;10µm) irritating eyes, nose, throat; worsen asthma and respiratory issues.</div>
+                <div style={{ marginBottom: '6px' }}><strong>NO₂</strong>: From traffic and fuel burning; inflames airways, triggers asthma, lowers lung function.</div>
+                <div style={{ marginBottom: '6px' }}><strong>O₃</strong>: Ground-level ozone; causes chest pain, coughing, and reduces lung capacity—especially during exercise.</div>
+                <div style={{ marginBottom: '6px' }}><strong>SO₂</strong>: From burning sulfur fuels; irritates respiratory system and can form particulate matter.</div>
+                <div><strong>CO</strong>: Colorless gas reducing oxygen delivery to organs; dangerous for heart and brain at high levels.</div>
+              </div>
+            </div>
+          )}
+        </div>
         <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {[
             { key: 'pm25', label: 'PM2.5 (μg/m³)', color: '#ff6b6b' },
