@@ -73,7 +73,7 @@ def fetch_air_quality(lat, lon):
     """
     try:
         # OpenAQ API endpoint for latest measurements
-        url = f"https://api.openaq.org/v2/latest?coordinates={lat},{lon}"
+        url = f"https://api.openaq.org/v3/latest?coordinates={lat},{lon}"
         
         # Headers with API key for authenticated requests
         headers = {
