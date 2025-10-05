@@ -1,286 +1,237 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import requests
-import os
-from dotenv import load_dotenv
+# backend/app.py
+"""
+AirAware + CleanMap Backend Server
+This Flask server fetches air quality and weather data from external APIs
+and serves it to our React frontend in a simple, combined format.
+"""
 
-# Load environment variables from .env file
+from flask import Flask, jsonify, request
+from flask_cors import CORS  # This handles Cross-Origin requests from React
+import requests  # For making HTTP requests to external APIs
+import os
+from dotenv import load_dotenv  # For loading environment variables safely
+
+# Load environment variables from .env file (if it exists)
 load_dotenv()
 
+# Create the Flask application
 app = Flask(__name__)
-CORS(app)
 
-# Get API keys from environment variables
-OPENAQ_API_KEY = os.getenv('OPENAQ_API_KEY', '')  # Get your free key from platform.openaq.org
-OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY', 'your_openweather_api_key_here')
+# Enable CORS to allow our React app (running on port 5173) to talk to this Flask server
+# Without CORS, the browser would block requests between different ports
+CORS(app, origins=['http://localhost:5173', 'http://localhost:3000', '*'])
+
+# API Configuration
+# Get your free API key from: https://openweathermap.org/api
+OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY', 'YOUR_API_KEY_HERE')
+
+# API endpoints we'll be calling
+OPENAQ_API_URL = 'https://api.openaq.org/v2/latest'
+OPENWEATHER_API_URL = 'https://api.openweathermap.org/data/2.5/weather'
+
+def calculate_aqi_from_pm25(pm25):
+    """
+    Convert PM2.5 concentration (μg/m³) to AQI value
+    Using simplified US EPA formula
+    
+    PM2.5 is one of the main pollutants measured
+    AQI makes it easier for people to understand air quality
+    """
+    if pm25 <= 12.0:
+        # Good air quality
+        return round((50/12.0) * pm25)
+    elif pm25 <= 35.4:
+        # Moderate air quality
+        return round(((100-51)/(35.4-12.1)) * (pm25-12.1) + 51)
+    elif pm25 <= 55.4:
+        # Unhealthy for sensitive groups
+        return round(((150-101)/(55.4-35.5)) * (pm25-35.5) + 101)
+    elif pm25 <= 150.4:
+        # Unhealthy
+        return round(((200-151)/(150.4-55.5)) * (pm25-55.5) + 151)
+    else:
+        # Very unhealthy or hazardous
+        return round(((300-201)/(250.4-150.5)) * (pm25-150.5) + 201)
+
+def get_aqi_category(aqi):
+    """
+    Convert AQI number to a category name
+    This helps users quickly understand if air quality is safe
+    """
+    if aqi <= 50:
+        return "Good"
+    elif aqi <= 100:
+        return "Moderate"
+    elif aqi <= 150:
+        return "Unhealthy for Sensitive Groups"
+    elif aqi <= 200:
+        return "Unhealthy"
+    elif aqi <= 300:
+        return "Very Unhealthy"
+    else:
+        return "Hazardous"
 
 @app.route('/api/airquality', methods=['GET'])
 def get_air_quality():
     """
-    Main API endpoint that fetches both air quality and weather data
-    URL format: /api/airquality?lat=40.7128&lon=-74.0060
+    Main API endpoint that fetches and combines air quality and weather data
+    
+    Expected URL format: /api/airquality?lat=33.749&lon=-84.388
+    Returns: JSON object with combined air quality and weather data
     """
+    
     try:
-        # Get latitude and longitude from URL parameters
-        lat = request.args.get('lat', type=float)
-        lon = request.args.get('lon', type=float)
+        # Step 1: Get coordinates from the URL parameters
+        lat = request.args.get('lat')
+        lon = request.args.get('lon')
         
-        # Validate coordinates
-        if lat is None or lon is None:
-            return jsonify({'error': 'Missing latitude or longitude parameters'}), 400
+        # Check if both coordinates were provided
+        if not lat or not lon:
+            return jsonify({'error': 'Missing latitude or longitude'}), 400
         
-        if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
-            return jsonify({'error': 'Invalid coordinates'}), 400
+        # Convert string coordinates to numbers
+        lat = float(lat)
+        lon = float(lon)
         
-        print(f"Fetching data for coordinates: {lat}, {lon}")
+        print(f"📍 Fetching data for coordinates: {lat}, {lon}")
         
-        # Fetch air quality data from OpenAQ
-        air_quality_data = fetch_air_quality(lat, lon)
-        
-        # Fetch weather data from OpenWeatherMap
-        weather_data = fetch_weather(lat, lon)
-        
-        # Combine both datasets
-        combined_data = {
-            'location': {
-                'latitude': lat,
-                'longitude': lon,
-                'city': weather_data.get('city', 'Unknown Location')
-            },
-            'air_quality': {
-                'aqi': air_quality_data.get('aqi', 0),
-                'pm25': air_quality_data.get('pm25', 0),
-                'category': air_quality_data.get('category', 'Unknown'),
-                'last_updated': air_quality_data.get('last_updated', 'Unknown')
-            },
-            'weather': {
-                'temperature': weather_data.get('temperature', 0),
-                'humidity': weather_data.get('humidity', 0),
-                'wind_speed': weather_data.get('wind_speed', 0),
-                'description': weather_data.get('description', 'Unknown')
-            }
+        # Initialize our response object with default values
+        response_data = {
+            'city': 'Unknown Location',
+            'aqi': None,
+            'pm25': None,
+            'temperature': None,
+            'humidity': None,
+            'category': 'Unknown'
         }
         
-        return jsonify(combined_data)
+        # Step 2: Fetch Weather Data from OpenWeatherMap
+        try:
+            print("☁️ Fetching weather data...")
+            
+            # Prepare the request to OpenWeatherMap
+            weather_params = {
+                'lat': lat,
+                'lon': lon,
+                'appid': OPENWEATHER_API_KEY,
+                'units': 'metric'  # Get temperature in Celsius
+            }
+            
+            # Make the API call
+            weather_response = requests.get(
+                OPENWEATHER_API_URL, 
+                params=weather_params,
+                timeout=5  # Wait max 5 seconds for response
+            )
+            
+            # Check if the request was successful
+            if weather_response.status_code == 200:
+                weather_data = weather_response.json()
+                
+                # Extract the data we need
+                response_data['city'] = weather_data.get('name', 'Unknown Location')
+                response_data['temperature'] = round(
+                    weather_data.get('main', {}).get('temp', 0), 1
+                )
+                response_data['humidity'] = weather_data.get('main', {}).get('humidity', 0)
+                
+                print(f"✅ Weather data retrieved for: {response_data['city']}")
+            else:
+                print(f"⚠️ Weather API error: {weather_response.status_code}")
+                
+        except Exception as e:
+            print(f"❌ Error fetching weather: {str(e)}")
+            # Continue even if weather fails - we might still get air quality
         
+        # Step 3: Fetch Air Quality Data from OpenAQ
+        try:
+            print("🌫️ Fetching air quality data...")
+            
+            # OpenAQ requires a search radius (in meters)
+            # We'll search within 25km of the coordinates
+            openaq_params = {
+                'coordinates': f"{lat},{lon}",
+                'radius': 25000,  # 25 km radius
+                'limit': 1,  # Get just the nearest station
+                'parameter': 'pm25'  # We want PM2.5 data
+            }
+            
+            # Make the API call
+            air_response = requests.get(
+                OPENAQ_API_URL,
+                params=openaq_params,
+                timeout=5
+            )
+            
+            if air_response.status_code == 200:
+                air_data = air_response.json()
+                
+                # Check if we got any results
+                if air_data.get('results') and len(air_data['results']) > 0:
+                    result = air_data['results'][0]
+                    
+                    # Look for PM2.5 measurement
+                    measurements = result.get('measurements', [])
+                    for measurement in measurements:
+                        if measurement.get('parameter') == 'pm25':
+                            pm25_value = measurement.get('value', 0)
+                            
+                            # Store PM2.5 and calculate AQI
+                            response_data['pm25'] = round(pm25_value, 1)
+                            response_data['aqi'] = calculate_aqi_from_pm25(pm25_value)
+                            response_data['category'] = get_aqi_category(response_data['aqi'])
+                            
+                            print(f"✅ Air quality data found: AQI={response_data['aqi']}")
+                            break
+                else:
+                    print("⚠️ No air quality stations found nearby")
+                    # Use demo data if no stations found
+                    response_data['pm25'] = 15.0
+                    response_data['aqi'] = 55
+                    response_data['category'] = "Moderate (Demo Data)"
+            else:
+                print(f"⚠️ OpenAQ API error: {air_response.status_code}")
+                # Use demo data if API fails
+                response_data['pm25'] = 10.0
+                response_data['aqi'] = 42
+                response_data['category'] = "Good (Demo Data)"
+                
+        except Exception as e:
+            print(f"❌ Error fetching air quality: {str(e)}")
+            # Provide demo data if there's an error
+            response_data['pm25'] = 12.0
+            response_data['aqi'] = 50
+            response_data['category'] = "Good (Demo Data)"
+        
+        # Step 4: Return the combined data
+        print(f"📊 Returning combined data: {response_data}")
+        return jsonify(response_data), 200
+        
+    except ValueError as e:
+        # Handle invalid coordinate format
+        return jsonify({'error': 'Invalid coordinates format'}), 400
     except Exception as e:
-        print(f"Error: {str(e)}")
+        # Handle any other unexpected errors
+        print(f"❌ Server error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-def fetch_air_quality(lat, lon):
+@app.route('/health', methods=['GET'])
+def health_check():
     """
-    Fetch air quality data from OpenAQ API with API key for better rate limits
+    Simple endpoint to check if the server is running
+    Visit http://localhost:5000/health to test
     """
-    try:
-        # OpenAQ API endpoint for latest measurements
-        url = f"https://api.openaq.org/v3/latest?coordinates={lat},{lon}"
-        
-        # Headers with API key for authenticated requests
-        headers = {
-            'X-API-Key': OPENAQ_API_KEY,
-            'User-Agent': 'AirAware-CleanMap/1.0 (NASA Hackathon Project)',
-            'Accept': 'application/json'
-        }
-        
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        
-        data = response.json()
-        
-        # Extract PM2.5 data from the response
-        pm25 = None
-        aqi = 0
-        
-        if data.get('results'):
-            # Look for PM2.5 measurements in the results
-            for result in data['results']:
-                if result.get('measurements'):
-                    for measurement in result['measurements']:
-                        if measurement.get('parameter') == 'pm25':
-                            pm25 = measurement.get('value')
-                            # Calculate simple AQI from PM2.5
-                            aqi = calculate_aqi_from_pm25(pm25)
-                            break
-                    if pm25:
-                        break
-        
-        # If no PM2.5 data found, try to get US AQI if available
-        if pm25 is None:
-            pm25, aqi = extract_aqi_from_measurements(data)
-        
-        return {
-            'pm25': pm25 or 0,
-            'aqi': aqi,
-            'category': get_aqi_category(aqi),
-            'last_updated': 'Recent'
-        }
-        
-    except requests.RequestException as e:
-        print(f"OpenAQ API error: {e}")
-        # Return default values if API fails
-        return {
-            'pm25': 0,
-            'aqi': 0,
-            'category': 'Unknown',
-            'last_updated': 'Unknown'
-        }
+    return jsonify({
+        'status': 'healthy',
+        'message': 'AirAware backend is running!'
+    }), 200
 
-def extract_aqi_from_measurements(data):
-    """
-    Alternative method to extract AQI data if PM2.5 is not available
-    """
-    pm25 = None
-    aqi = 0
-    
-    if data.get('results'):
-        for result in data['results']:
-            if result.get('measurements'):
-                for measurement in result['measurements']:
-                    parameter = measurement.get('parameter', '').lower()
-                    value = measurement.get('value')
-                    
-                    # Look for PM2.5
-                    if parameter == 'pm25' and value is not None:
-                        pm25 = value
-                        aqi = calculate_aqi_from_pm25(value)
-                        return pm25, aqi
-                    
-                    # Look for direct AQI measurements
-                    elif parameter in ['aqi', 'us-aqi'] and value is not None:
-                        aqi = value
-                        # Estimate PM2.5 from AQI (rough approximation)
-                        pm25 = estimate_pm25_from_aqi(value)
-                        return pm25, aqi
-    
-    return pm25, aqi
-
-def estimate_pm25_from_aqi(aqi):
-    """
-    Rough estimation of PM2.5 from AQI (simplified)
-    """
-    if aqi <= 50:
-        return aqi * 12 / 50
-    elif aqi <= 100:
-        return 12 + (aqi - 50) * (35.4 - 12) / 50
-    elif aqi <= 150:
-        return 35.4 + (aqi - 100) * (55.4 - 35.4) / 50
-    else:
-        return 55.4 + (aqi - 150) * (150.4 - 55.4) / 50
-
-def calculate_aqi_from_pm25(pm25):
-    """
-    Calculate AQI from PM2.5 concentration using US EPA breakpoints
-    This performs linear interpolation across standard breakpoints.
-    """
-    try:
-        if pm25 is None:
-            return 0
-        c = float(pm25)
-    except (TypeError, ValueError):
-        return 0
-
-    # Breakpoints for PM2.5 (µg/m3) and corresponding AQI
-    breakpoints = [
-        (0.0, 12.0, 0, 50),
-        (12.1, 35.4, 51, 100),
-        (35.5, 55.4, 101, 150),
-        (55.5, 150.4, 151, 200),
-        (150.5, 250.4, 201, 300),
-        (250.5, 350.4, 301, 400),
-        (350.5, 500.4, 401, 500),
-    ]
-
-    for (clow, chigh, ilow, ihigh) in breakpoints:
-        if clow <= c <= chigh:
-            # linear interpolation
-            aqi = ((ihigh - ilow) / (chigh - clow)) * (c - clow) + ilow
-            return int(round(aqi))
-
-    # If outside known range, cap it
-    if c > 500.4:
-        return 500
-    return 0
-
-
-def get_aqi_category(aqi):
-    """Return AQI category name for a numeric AQI value."""
-    try:
-        a = int(aqi)
-    except (TypeError, ValueError):
-        return 'Unknown'
-
-    if a <= 50:
-        return 'Good'
-    if a <= 100:
-        return 'Moderate'
-    if a <= 150:
-        return 'Unhealthy for Sensitive Groups'
-    if a <= 200:
-        return 'Unhealthy'
-    if a <= 300:
-        return 'Very Unhealthy'
-    return 'Hazardous'
-
-
-def fetch_weather(lat, lon):
-    """
-    Fetch basic current weather from OpenWeatherMap.
-    Returns a dict with temperature (C), humidity (%), wind_speed (m/s), description, and city name.
-    """
-    try:
-        if not OPENWEATHER_API_KEY:
-            print('Warning: OPENWEATHER_API_KEY not set')
-            return {
-                'temperature': 0,
-                'humidity': 0,
-                'wind_speed': 0,
-                'description': 'Unknown',
-                'city': 'Unknown Location'
-            }
-
-        url = 'https://api.openweathermap.org/data/2.5/weather'
-        params = {
-            'lat': lat,
-            'lon': lon,
-            'units': 'metric',
-            'appid': OPENWEATHER_API_KEY
-        }
-
-        resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()
-        w = resp.json()
-
-        temperature = w.get('main', {}).get('temp', 0)
-        humidity = w.get('main', {}).get('humidity', 0)
-        wind_speed = w.get('wind', {}).get('speed', 0)
-        description = ''
-        if w.get('weather') and isinstance(w.get('weather'), list) and len(w.get('weather')) > 0:
-            description = w['weather'][0].get('description', '')
-
-        city = w.get('name') or 'Unknown Location'
-
-        return {
-            'temperature': temperature,
-            'humidity': humidity,
-            'wind_speed': wind_speed,
-            'description': description,
-            'city': city
-        }
-
-    except requests.RequestException as e:
-        print(f'OpenWeather API error: {e}')
-        return {
-            'temperature': 0,
-            'humidity': 0,
-            'wind_speed': 0,
-            'description': 'Unknown',
-            'city': 'Unknown Location'
-        }
-
-# Rest of the functions remain the same (calculate_aqi_from_pm25, get_aqi_category, fetch_weather)
-
+# Run the Flask application
 if __name__ == '__main__':
-    # Run the Flask development server
-    print("Starting AirAware + CleanMap Backend Server...")
-    print("Make sure to set OPENAQ_API_KEY and OPENWEATHER_API_KEY in your .env file")
-    app.run(debug=True, port=5000)
+    print("\n🚀 Starting AirAware Backend Server...")
+    print("📍 Server will run at: http://localhost:5000")
+    print("🔧 Test the API at: http://localhost:5000/api/airquality?lat=33.749&lon=-84.388")
+    print("💡 Press Ctrl+C to stop the server\n")
+    
+    # Run in debug mode for development (shows detailed errors)
+    app.run(debug=True, host='0.0.0.0', port=5000)

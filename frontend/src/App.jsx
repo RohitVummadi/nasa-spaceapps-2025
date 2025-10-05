@@ -1,28 +1,345 @@
-import React from 'react'
-import Map from './components/Map'
+// frontend/src/App.jsx
+/**
+ * AirAware + CleanMap Frontend
+ * This React app displays a map with real-time air quality and weather data
+ */
+
+import React, { useState, useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix Leaflet default marker icon issue in React
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 function App() {
+  // State variables to manage our app's data
+  const [userLocation, setUserLocation] = useState(null); // Stores user's coordinates
+  const [airQualityData, setAirQualityData] = useState(null); // Stores API response
+  const [loading, setLoading] = useState(true); // Shows loading state
+  const [error, setError] = useState(null); // Stores error messages
+  const [lastUpdate, setLastUpdate] = useState(null); // Tracks last refresh time
+  
+  // useRef to store the interval ID so we can clear it later
+  const refreshIntervalRef = useRef(null);
+
+  /**
+   * Create a colored marker icon based on AQI category
+   * Green = Good, Yellow = Moderate, Orange = Unhealthy, Red = Very Unhealthy
+   */
+  const getColoredIcon = (category) => {
+    // Choose color based on air quality category
+    let color = '#808080'; // Default gray
+    
+    if (category) {
+      if (category.includes('Good')) color = '#00e400';
+      else if (category.includes('Moderate')) color = '#ffff00';
+      else if (category.includes('Unhealthy for')) color = '#ff7e00';
+      else if (category.includes('Very Unhealthy')) color = '#ff0000';
+      else if (category.includes('Unhealthy')) color = '#ff7e00';
+      else if (category.includes('Hazardous')) color = '#7e0023';
+    }
+
+    // Create a custom HTML marker with the chosen color
+    const markerHtmlStyles = `
+      background-color: ${color};
+      width: 2.5rem;
+      height: 2.5rem;
+      display: block;
+      left: -1.25rem;
+      top: -1.25rem;
+      position: relative;
+      border-radius: 2.5rem 2.5rem 0;
+      transform: rotate(45deg);
+      border: 2px solid #FFFFFF;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+    `;
+
+    return L.divIcon({
+      className: 'custom-div-icon',
+      html: `<span style="${markerHtmlStyles}" />`,
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+    });
+  };
+
+  /**
+   * Fetch air quality and weather data from our Flask backend
+   * This function calls our API endpoint with the user's coordinates
+   */
+  const fetchAirQualityData = async (lat, lon) => {
+    console.log(`🔍 Fetching data for coordinates: ${lat}, ${lon}`);
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Call our Flask backend API
+      // The backend will fetch data from OpenAQ and OpenWeatherMap
+      const response = await fetch(
+        `http://localhost:5000/api/airquality?lat=${lat}&lon=${lon}`
+      );
+
+      // Check if the request was successful
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      // Parse the JSON response
+      const data = await response.json();
+      console.log('📊 Data received:', data);
+      
+      // Store the data in state
+      setAirQualityData(data);
+      setLastUpdate(new Date());
+      
+    } catch (err) {
+      console.error('❌ Error fetching data:', err);
+      setError('Could not fetch air quality data. Make sure the Flask server is running on port 5000.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Get the user's current location using the browser's Geolocation API
+   */
+  const getUserLocation = () => {
+    console.log('📍 Getting user location...');
+    
+    // Check if the browser supports geolocation
+    if (!navigator.geolocation) {
+      setError('Your browser does not support geolocation');
+      setLoading(false);
+      return;
+    }
+
+    // Request the user's current position
+    navigator.geolocation.getCurrentPosition(
+      // Success callback - we got the location!
+      (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        
+        console.log('✅ Location found:', coords);
+        setUserLocation(coords);
+        
+        // Now fetch air quality data for this location
+        fetchAirQualityData(coords.lat, coords.lng);
+      },
+      
+      // Error callback - something went wrong
+      (error) => {
+        console.error('❌ Location error:', error);
+        setError('Could not get your location. Please enable location services.');
+        
+        // Use a default location (Atlanta, GA) as fallback
+        const defaultCoords = { lat: 33.749, lng: -84.388 };
+        setUserLocation(defaultCoords);
+        fetchAirQualityData(defaultCoords.lat, defaultCoords.lng);
+      }
+    );
+  };
+
+  /**
+   * Set up the component when it first loads
+   * This runs once when the app starts
+   */
+  useEffect(() => {
+    // Get initial location and data
+    getUserLocation();
+
+    // Set up automatic refresh every 5 minutes (300,000 milliseconds)
+    console.log('⏰ Setting up 5-minute auto-refresh...');
+    
+    refreshIntervalRef.current = setInterval(() => {
+      console.log('🔄 Auto-refreshing data (5-minute interval)');
+      
+      // If we have a location, refresh the data
+      if (userLocation) {
+        fetchAirQualityData(userLocation.lat, userLocation.lng);
+      }
+    }, 300000); // 300,000 ms = 5 minutes
+
+    // Cleanup function - runs when component unmounts
+    return () => {
+      console.log('🧹 Cleaning up refresh interval');
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, []); // Empty array means this runs once on mount
+
+  /**
+   * Manual refresh button handler
+   */
+  const handleManualRefresh = () => {
+    if (userLocation) {
+      console.log('🔄 Manual refresh triggered');
+      fetchAirQualityData(userLocation.lat, userLocation.lng);
+    }
+  };
+
   return (
-    <div className="h-screen w-screen">
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <header className="bg-blue-600 text-white p-4 shadow-lg">
-        <div className="container mx-auto">
-          <h1 className="text-2xl font-bold">🌍 AirAware + CleanMap</h1>
-          <p className="text-sm opacity-90">Real-time Air Quality & Weather Monitoring</p>
+      <div style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        padding: '1rem',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}>
+        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>
+          🌍 AirAware + CleanMap
+        </h1>
+        
+        {/* Status and controls */}
+        <div style={{ 
+          marginTop: '0.5rem', 
+          display: 'flex', 
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <div>
+            {loading && <span>⏳ Loading...</span>}
+            {!loading && lastUpdate && (
+              <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
+            )}
+          </div>
+          
+          <button
+            onClick={handleManualRefresh}
+            disabled={loading || !userLocation}
+            style={{
+              padding: '0.5rem 1rem',
+              background: 'white',
+              color: '#667eea',
+              border: 'none',
+              borderRadius: '0.25rem',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.5 : 1
+            }}
+          >
+            🔄 Refresh Now
+          </button>
         </div>
-      </header>
-      
-      {/* Main Map Component */}
-      <main className="h-[calc(100vh-80px)]">
-        <Map />
-      </main>
-      
-      {/* Footer */}
-      <footer className="bg-gray-800 text-white p-2 text-center text-xs">
-        <p>NASA Hackathon Project | Data updates every 5 minutes</p>
-      </footer>
+        
+        {/* Auto-refresh indicator */}
+        <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.8 }}>
+          ⏰ Auto-refreshes every 5 minutes
+        </div>
+        
+        {/* Error message */}
+        {error && (
+          <div style={{
+            background: 'rgba(255,255,255,0.2)',
+            padding: '0.5rem',
+            marginTop: '0.5rem',
+            borderRadius: '0.25rem'
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
+      </div>
+
+      {/* Map Container */}
+      <div style={{ flex: 1, position: 'relative' }}>
+        {userLocation ? (
+          <MapContainer 
+            center={[userLocation.lat, userLocation.lng]} 
+            zoom={13} 
+            style={{ height: '100%', width: '100%' }}
+          >
+            {/* OpenStreetMap tiles */}
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            />
+            
+            {/* Marker at user location */}
+            <Marker 
+              position={[userLocation.lat, userLocation.lng]}
+              icon={getColoredIcon(airQualityData?.category)}
+            >
+              {/* Popup with air quality and weather data */}
+              <Popup>
+                <div style={{ minWidth: '200px' }}>
+                  <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem' }}>
+                    📍 {airQualityData?.city || 'Loading...'}
+                  </h3>
+                  
+                  {airQualityData ? (
+                    <>
+                      {/* Air Quality Section */}
+                      <div style={{ marginBottom: '10px' }}>
+                        <strong>🌫️ Air Quality</strong>
+                        <div style={{ marginLeft: '10px', fontSize: '0.9rem' }}>
+                          <div>AQI: <strong>{airQualityData.aqi || 'N/A'}</strong> ({airQualityData.category})</div>
+                          <div>PM2.5: {airQualityData.pm25 || 'N/A'} μg/m³</div>
+                        </div>
+                      </div>
+                      
+                      {/* Weather Section */}
+                      <div>
+                        <strong>☁️ Weather</strong>
+                        <div style={{ marginLeft: '10px', fontSize: '0.9rem' }}>
+                          <div>Temp: {airQualityData.temperature || 'N/A'}°C</div>
+                          <div>Humidity: {airQualityData.humidity || 'N/A'}%</div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div>Loading data...</div>
+                  )}
+                </div>
+              </Popup>
+            </Marker>
+          </MapContainer>
+        ) : (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100%' 
+          }}>
+            <div>📍 Getting your location...</div>
+          </div>
+        )}
+      </div>
+
+      {/* Legend */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        right: '20px',
+        background: 'white',
+        padding: '10px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+        zIndex: 1000
+      }}>
+        <strong>AQI Scale</strong>
+        <div style={{ fontSize: '0.8rem', marginTop: '5px' }}>
+          <div>🟢 Good (0-50)</div>
+          <div>🟡 Moderate (51-100)</div>
+          <div>🟠 Unhealthy for Sensitive (101-150)</div>
+          <div>🔴 Unhealthy (151-200)</div>
+        </div>
+      </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
