@@ -221,6 +221,9 @@ function App() {
   const searchBoxRef = useRef(null);
   const infoHoverTimeoutRef = useRef(null);
   const [showPollutantInfo, setShowPollutantInfo] = useState(false);
+  const [showLayersContent, setShowLayersContent] = useState(true);
+  const [showWildfireContent, setShowWildfireContent] = useState(true);
+  const [showLegendContent, setShowLegendContent] = useState(true);
 
   /**
    * Create a colored marker icon based on AQI category
@@ -546,7 +549,10 @@ function App() {
    * Close search results when clicking outside
    */
   useEffect(() => {
+    const isMobile = () => window.matchMedia && window.matchMedia('(max-width: 640px)').matches;
     const handleClickOutside = (event) => {
+      // On mobile, keep results open; rely on selection or blur to close
+      if (isMobile()) return;
       if (searchBoxRef.current && !searchBoxRef.current.contains(event.target)) {
         setShowResults(false);
       }
@@ -565,7 +571,7 @@ function App() {
         }
       `}</style>
       {/* Header */}
-      <div style={{
+      <div id="app-header" style={{
         background: 'linear-gradient(135deg, #0d1b2a 0%, #1b263b 100%)',
         color: '#e0e1dd',
         padding: '1rem',
@@ -577,12 +583,12 @@ function App() {
         position: 'relative',
         zIndex: 3000
       }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>
+        <h1 id="app-title" style={{ margin: 0, fontSize: '1.5rem' }}>
           AirAware
         </h1>
         
         {/* Search Bar */}
-        <div style={{ 
+        <div id="search-container" style={{ 
           position: 'absolute',
           top: '70px',
           left: '50%',
@@ -619,69 +625,68 @@ function App() {
                 ...
               </div>
             )}
-          </div>
-          
-          {/* Search Results Dropdown */}
-          {showResults && searchResults.length > 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              background: '#1b263b',
-              color: '#e0e1dd',
-              borderRadius: '0.5rem',
-              marginTop: '0.5rem',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              maxHeight: '300px',
-              overflowY: 'auto',
-              zIndex: 4000
-            }}>
-              {searchResults.map((result, index) => (
-                <div
-                  key={index}
-                  onClick={() => handleCitySelect(result)}
-                  style={{
-                    padding: '0.75rem 1rem',
-                    cursor: 'pointer',
-                    borderBottom: index < searchResults.length - 1 ? '1px solid #415a77' : 'none',
-                    color: '#e0e1dd',
-                    transition: 'background 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.target.style.background = '#415a77'}
-                  onMouseLeave={(e) => e.target.style.background = '#1b263b'}
-                >
-                  <div style={{ fontWeight: '500' }}>{result.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                    {result.lat.toFixed(4)}, {result.lon.toFixed(4)}
+            {/* Search Results Dropdown (moved inside positioned wrapper) */}
+            {showResults && searchResults.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: '#1b263b',
+                color: '#e0e1dd',
+                borderRadius: '0.5rem',
+                marginTop: '0.5rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                maxHeight: '300px',
+                overflowY: 'auto',
+                zIndex: 4000
+              }}>
+                {searchResults.map((result, index) => (
+                  <div
+                    key={index}
+                    onClick={() => handleCitySelect(result)}
+                    style={{
+                      padding: '0.75rem 1rem',
+                      cursor: 'pointer',
+                      borderBottom: index < searchResults.length - 1 ? '1px solid #415a77' : 'none',
+                      color: '#e0e1dd',
+                      transition: 'background 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.background = '#415a77'}
+                    onMouseLeave={(e) => e.target.style.background = '#1b263b'}
+                  >
+                    <div style={{ fontWeight: '500' }}>{result.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                      {result.lat.toFixed(4)}, {result.lon.toFixed(4)}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          {showResults && searchResults.length === 0 && searchQuery.length >= 3 && !isSearching && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
-              background: '#1b263b',
-              borderRadius: '0.5rem',
-              marginTop: '0.5rem',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              padding: '1rem',
-              color: '#778da9',
-              textAlign: 'center',
-              zIndex: 4000
-            }}>
-              No cities found. Try a different search.
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+
+            {showResults && searchResults.length === 0 && searchQuery.length >= 3 && !isSearching && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                background: '#1b263b',
+                borderRadius: '0.5rem',
+                marginTop: '0.5rem',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                padding: '1rem',
+                color: '#778da9',
+                textAlign: 'center',
+                zIndex: 4000
+              }}>
+                No cities found. Try a different search.
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Status and controls */}
-        <div style={{ 
+        <div id="status-controls" style={{ 
           marginTop: '0.75rem', 
           display: 'flex', 
           justifyContent: 'space-between',
@@ -733,7 +738,7 @@ function App() {
         </div>
         
         {/* Auto-refresh indicator */}
-        <div style={{ 
+        <div className="auto-refresh-line" style={{ 
           fontSize: '0.75rem', 
           marginTop: '0.5rem', 
           opacity: 0.8,
@@ -977,7 +982,7 @@ function App() {
         boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
         zIndex: 1000,
         minWidth: '200px'
-      }}>
+      }} className="pollutant-layers">
         <div style={{ position: 'relative' }}
              onMouseEnter={() => {
                if (infoHoverTimeoutRef.current) clearTimeout(infoHoverTimeoutRef.current);
@@ -989,6 +994,25 @@ function App() {
              }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
             <strong>Pollutant Layers</strong>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button
+                aria-label="Collapse pollutant layers"
+                onClick={(e) => { e.stopPropagation(); setShowLayersContent(!showLayersContent); }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #415a77',
+                  color: '#e0e1dd',
+                  width: '22px',
+                  height: '22px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontWeight: 700,
+                  lineHeight: 1
+                }}
+              >{showLayersContent ? '▾' : '▸'}</button>
             <button
               aria-label="Pollutant info"
               onClick={(e) => {
@@ -1011,10 +1035,11 @@ function App() {
                 boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
               }}
             >i</button>
+            </div>
           </div>
 
           {showPollutantInfo && (
-            <div style={{
+            <div className="pollutant-info-card" style={{
               position: 'absolute',
               top: 0,
               left: '100%',
@@ -1040,41 +1065,43 @@ function App() {
             </div>
           )}
         </div>
-        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {[
-            { key: 'pm25', label: 'PM2.5 (μg/m³)', color: '#ff6b6b' },
-            { key: 'pm10', label: 'PM10 (μg/m³)', color: '#ffa726' },
-            { key: 'no2', label: 'NO₂ (μg/m³)', color: '#42a5f5' },
-            { key: 'o3', label: 'O₃ (μg/m³)', color: '#66bb6a' },
-            { key: 'so2', label: 'SO₂ (μg/m³)', color: '#ab47bc' },
-            { key: 'co', label: 'CO (mg/m³)', color: '#8d6e63' }
-          ].map(pollutant => (
-            <button
-              key={pollutant.key}
-              onClick={() => setActiveLayer(pollutant.key)}
-              style={{
-                background: activeLayer === pollutant.key ? '#415a77' : 'transparent',
-                color: '#e0e1dd',
-                border: `1px solid ${pollutant.color}`,
-                borderRadius: '4px',
-                padding: '6px 8px',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-            >
-              <div style={{
-                width: '8px',
-                height: '8px',
-                backgroundColor: pollutant.color,
-                borderRadius: '50%'
-              }}></div>
-              {pollutant.label}
-            </button>
-          ))}
-        </div>
+        {showLayersContent && (
+          <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {[
+              { key: 'pm25', label: 'PM2.5 (μg/m³)', color: '#ff6b6b' },
+              { key: 'pm10', label: 'PM10 (μg/m³)', color: '#ffa726' },
+              { key: 'no2', label: 'NO₂ (μg/m³)', color: '#42a5f5' },
+              { key: 'o3', label: 'O₃ (μg/m³)', color: '#66bb6a' },
+              { key: 'so2', label: 'SO₂ (μg/m³)', color: '#ab47bc' },
+              { key: 'co', label: 'CO (mg/m³)', color: '#8d6e63' }
+            ].map(pollutant => (
+              <button
+                key={pollutant.key}
+                onClick={() => setActiveLayer(pollutant.key)}
+                style={{
+                  background: activeLayer === pollutant.key ? '#415a77' : 'transparent',
+                  color: '#e0e1dd',
+                  border: `1px solid ${pollutant.color}`,
+                  borderRadius: '4px',
+                  padding: '6px 8px',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <div style={{
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: pollutant.color,
+                  borderRadius: '50%'
+                }}></div>
+                {pollutant.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Fire Layer Toggle */}
@@ -1090,30 +1117,52 @@ function App() {
         zIndex: 1000,
         minWidth: '150px',
         textAlign: 'center'
-      }}>
-        <strong>Wildfire Data</strong>
-        <div style={{ marginTop: '8px' }}>
+      }} className="wildfire-card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <strong>Wildfire Data</strong>
           <button
-            onClick={() => setShowFires(!showFires)}
+            aria-label="Collapse wildfire card"
+            onClick={() => setShowWildfireContent(!showWildfireContent)}
             style={{
-              background: showFires ? '#ff4444' : 'transparent',
+              background: 'transparent',
+              border: '1px solid #415a77',
               color: '#e0e1dd',
-              border: '1px solid #ff4444',
+              width: '22px',
+              height: '22px',
               borderRadius: '4px',
-              padding: '8px 12px',
-              fontSize: '0.9rem',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
-              width: '100%',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              cursor: 'pointer',
+              fontWeight: 700,
+              lineHeight: 1
             }}
-          >
-            {showFires ? 'Hide Fires' : 'Show Fires'}
-            {fireLoading && <span style={{ fontSize: '0.7rem' }}>(Loading...)</span>}
-          </button>
+          >{showWildfireContent ? '▾' : '▸'}</button>
         </div>
+        {showWildfireContent && (
+          <div style={{ marginTop: '8px' }}>
+            <button
+              onClick={() => setShowFires(!showFires)}
+              style={{
+                background: showFires ? '#ff4444' : 'transparent',
+                color: '#e0e1dd',
+                border: '1px solid #ff4444',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                width: '100%',
+                justifyContent: 'center'
+              }}
+            >
+              {showFires ? 'Hide Fires' : 'Show Fires'}
+              {fireLoading && <span style={{ fontSize: '0.7rem' }}>(Loading...)</span>}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Data Availability Notification */}
@@ -1147,26 +1196,48 @@ function App() {
         borderRadius: '8px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
         zIndex: 1000
-      }}>
-        <strong>AQI Scale</strong>
-        <div style={{ fontSize: '0.8rem', marginTop: '5px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#00e400', borderRadius: '50%', marginRight: '8px' }}></div>
-            Good (0-50)
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#ffff00', borderRadius: '50%', marginRight: '8px' }}></div>
-            Moderate (51-100)
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#ff7e00', borderRadius: '50%', marginRight: '8px' }}></div>
-            Unhealthy for Sensitive (101-150)
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
-            <div style={{ width: '12px', height: '12px', backgroundColor: '#ff0000', borderRadius: '50%', marginRight: '8px' }}></div>
-            Unhealthy (151-200)
-          </div>
+      }} className="aqi-legend">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+          <strong>AQI Scale</strong>
+          <button
+            aria-label="Collapse AQI legend"
+            onClick={() => setShowLegendContent(!showLegendContent)}
+            style={{
+              background: 'transparent',
+              border: '1px solid #415a77',
+              color: '#e0e1dd',
+              width: '22px',
+              height: '22px',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              fontWeight: 700,
+              lineHeight: 1
+            }}
+          >{showLegendContent ? '▾' : '▸'}</button>
         </div>
+        {showLegendContent && (
+          <div style={{ fontSize: '0.8rem', marginTop: '5px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+              <div style={{ width: '12px', height: '12px', backgroundColor: '#00e400', borderRadius: '50%', marginRight: '8px' }}></div>
+              Good (0-50)
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+              <div style={{ width: '12px', height: '12px', backgroundColor: '#ffff00', borderRadius: '50%', marginRight: '8px' }}></div>
+              Moderate (51-100)
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+              <div style={{ width: '12px', height: '12px', backgroundColor: '#ff7e00', borderRadius: '50%', marginRight: '8px' }}></div>
+              Unhealthy for Sensitive (101-150)
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+              <div style={{ width: '12px', height: '12px', backgroundColor: '#ff0000', borderRadius: '50%', marginRight: '8px' }}></div>
+              Unhealthy (151-200)
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

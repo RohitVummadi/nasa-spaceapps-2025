@@ -244,4 +244,100 @@
   display: none !important;
 }
 
+/* Responsive: Mobile adjustments */
+@media (max-width: 640px) {
+  #app-header {
+    padding: 0.75rem 0.75rem 1rem 0.75rem;
+  }
+
+  #app-title {
+    font-size: 1.1rem !important;
+  }
+
+  /* Make search flow in the header (no overlap with buttons) */
+  #search-container {
+    position: static !important;
+    transform: none !important;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-top: 0.5rem !important;
+  }
+
+  #search-container input {
+    font-size: 0.9rem !important;
+    padding: 0.6rem 2.2rem 0.6rem 0.8rem !important;
+  }
+
+  #status-controls {
+    margin-top: 0.5rem !important;
+    gap: 0.5rem !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important; /* center contents on mobile */
+  }
+
+  /* Hide last updated text on mobile */
+  #status-controls > div:first-child { display: none !important; }
+
+  #status-controls button {
+    padding: 0.4rem 0.7rem !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* Center the button group */
+  #status-controls > div:last-child {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    display: flex !important;
+    justify-content: center !important;
+  }
+
+  /* Hide the auto-refresh line on mobile */
+  #app-header .auto-refresh-line { display: none !important; }
+
+  /* Pollutant layer box */
+  .pollutant-layers {
+    min-width: 170px !important;
+    padding: 8px !important;
+  }
+
+  .pollutant-layers button {
+    padding: 5px 7px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Info card width */
+  .pollutant-info-card {
+    width: 250px !important;
+  }
+
+  /* Compact info card variant on mobile to keep in-bounds */
+  .pollutant-info-card {
+    position: fixed !important; /* detach from box to avoid overflow */
+    right: 12px !important;
+    top: 150px !important;
+    left: 12px !important; /* allow full width with margins */
+    width: auto !important;
+    max-width: none !important;
+    transform: none !important;
+    z-index: 4000 !important;
+    padding: 10px !important;
+  }
+
+  /* AQI legend: shrink on mobile */
+  .aqi-legend {
+    padding: 6px !important;
+    min-width: 140px !important;
+    transform: scale(0.8); /* ~20% smaller globally */
+    transform-origin: bottom right;
+  }
+  .aqi-legend strong { font-size: 0.85rem !important; }
+  .aqi-legend div { font-size: 0.7rem !important; }
+
+  /* Shift wildfire card down ~50px on mobile */
+  .wildfire-card {
+    bottom: 120px !important; /* was 170px */
+  }
+}
 
