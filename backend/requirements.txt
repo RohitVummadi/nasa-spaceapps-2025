@@ -1,4 +1,8 @@
-Flask==2.3.3
-flask-cors==4.0.0
-python-dotenv==1.0.0
-requests==2.31.0
+# backend/requirements.txt
+# Python dependencies for the Flask backend
+
+Flask==3.0.0           # Web framework
+flask-cors==4.0.0      # Handle Cross-Origin Resource Sharing
+requests==2.31.0       # HTTP library for API calls
+python-dotenv==1.0.0   # Load environment variables from .env file
+gunicorn==21.2.0       # Production WSGI server (for deployment)

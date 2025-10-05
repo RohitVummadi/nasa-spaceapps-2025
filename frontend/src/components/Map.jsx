@@ -59,12 +59,35 @@ const Map = () => {
       }
       
       const data = await response.json()
-      
+
+      // Backend returns a flattened object like:
+      // { city, latitude, longitude, aqi, pm25, category, temperature, humidity, wind_speed, description }
       if (data.error) {
         throw new Error(data.error)
       }
-      
-      setAirQualityData(data)
+
+      // Normalize into the shape this component expects (previous code used nested objects).
+      const normalized = {
+        location: {
+          city: data.city || 'Unknown',
+          latitude: data.latitude,
+          longitude: data.longitude,
+        },
+        air_quality: {
+          aqi: data.aqi,
+          pm25: data.pm25,
+          category: data.category,
+          last_updated: data.last_updated
+        },
+        weather: {
+          temperature: data.temperature,
+          humidity: data.humidity,
+          wind_speed: data.wind_speed,
+          description: data.description
+        }
+      }
+
+      setAirQualityData(normalized)
       setError('')
       setLastUpdated(new Date())
       console.log('Data fetched successfully:', data)
