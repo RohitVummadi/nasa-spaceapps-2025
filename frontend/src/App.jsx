@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import './App.css';
@@ -22,6 +22,21 @@ let DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
+
+/**
+ * Component to update map view when location changes
+ */
+function MapUpdater({ center, zoom }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (center) {
+      map.setView(center, zoom || 13);
+    }
+  }, [center, zoom, map]);
+  
+  return null;
+}
 
 function App() {
   // State variables to manage our app's data
@@ -301,7 +316,9 @@ function App() {
                 border: 'none',
                 fontSize: '1rem',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                outline: 'none'
+                outline: 'none',
+                color: '#374151',
+                backgroundColor: 'white'
               }}
             />
             {isSearching && (
@@ -452,6 +469,9 @@ function App() {
             zoom={13} 
             style={{ height: '100%', width: '100%' }}
           >
+            {/* Component to update map view when location changes */}
+            <MapUpdater center={[userLocation.lat, userLocation.lng]} zoom={13} />
+            
             {/* OpenStreetMap tiles */}
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
