@@ -567,7 +567,13 @@ function App() {
         background: 'linear-gradient(135deg, #0d1b2a 0%, #1b263b 100%)',
         color: '#e0e1dd',
         padding: '1rem',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        textAlign: 'center',
+        position: 'relative',
+        zIndex: 3000
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>
           AirAware
@@ -575,9 +581,12 @@ function App() {
         
         {/* Search Bar */}
         <div style={{ 
-          marginTop: '1rem', 
-          position: 'relative',
-          maxWidth: '500px'
+          position: 'absolute',
+          top: '70px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          maxWidth: '500px',
+          width: '100%'
         }} ref={searchBoxRef}>
           <div style={{ position: 'relative' }}>
             <input
@@ -624,7 +633,7 @@ function App() {
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               maxHeight: '300px',
               overflowY: 'auto',
-              zIndex: 1000
+              zIndex: 4000
             }}>
               {searchResults.map((result, index) => (
                 <div
@@ -662,7 +671,7 @@ function App() {
               padding: '1rem',
               color: '#778da9',
               textAlign: 'center',
-              zIndex: 1000
+              zIndex: 4000
             }}>
               No cities found. Try a different search.
             </div>
@@ -674,7 +683,8 @@ function App() {
           marginTop: '0.75rem', 
           display: 'flex', 
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          width: '100%'
         }}>
           <div>
             {loading && <span>Loading...</span>}
@@ -721,7 +731,13 @@ function App() {
         </div>
         
         {/* Auto-refresh indicator */}
-        <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.8 }}>
+        <div style={{ 
+          fontSize: '0.75rem', 
+          marginTop: '0.5rem', 
+          opacity: 0.8,
+          width: '100%',
+          textAlign: 'left'
+        }}>
           Auto-refreshes every 5 minutes
         </div>
         
