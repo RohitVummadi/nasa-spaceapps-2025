@@ -140,10 +140,10 @@ const Map = () => {
 
   // Function to get marker color based on AQI
   const getMarkerColor = (aqi) => {
-    if (aqi <= 50) return 'green'
-    if (aqi <= 100) return 'yellow'
-    if (aqi <= 150) return 'orange'
-    return 'red'
+    if (aqi <= 50) return '#00e400'
+    if (aqi <= 100) return '#ffff00'
+    if (aqi <= 150) return '#ff7e00'
+    return '#ff0000'
   }
 
   // Create custom icon based on AQI
@@ -151,7 +151,7 @@ const Map = () => {
     const color = getMarkerColor(aqi)
     return L.divIcon({
       className: 'custom-marker',
-      html: `<div style="background-color: ${color}; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
+      html: `<div style="background-color: ${color}; width: 20px; height: 20px; border-radius: 50%; border: none !important; outline: none !important; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
       iconSize: [20, 20],
       iconAnchor: [10, 10],
     })

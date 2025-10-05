@@ -21,7 +21,7 @@ let DefaultIcon = L.icon({
     iconAnchor: [12, 41]
 });
 
-L.Marker.prototype.options.icon = DefaultIcon;
+// L.Marker.prototype.options.icon = DefaultIcon; // Removed to prevent white border on custom markers
 
 /**
  * Component to update map view when location changes
@@ -82,7 +82,6 @@ function App() {
       position: relative;
       border-radius: 2.5rem 2.5rem 0;
       transform: rotate(45deg);
-      border: 2px solid #FFFFFF;
       box-shadow: 0 3px 6px rgba(0,0,0,0.3);
     `;
 
@@ -108,7 +107,7 @@ function App() {
       // Call our Flask backend API
       // The backend will fetch data from OpenAQ and OpenWeatherMap
       const response = await fetch(
-        `http://localhost:5000/api/airquality?lat=${lat}&lon=${lon}`
+        `http://localhost:5001/api/airquality?lat=${lat}&lon=${lon}`
       );
 
       // Check if the request was successful
@@ -126,7 +125,7 @@ function App() {
       
     } catch (err) {
       console.error('❌ Error fetching data:', err);
-      setError('Could not fetch air quality data. Make sure the Flask server is running on port 5000.');
+      setError('Could not fetch air quality data. Make sure the Flask server is running on port 5001.');
     } finally {
       setLoading(false);
     }
@@ -285,16 +284,16 @@ function App() {
   }, []);
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
       {/* Header */}
       <div style={{
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        color: 'white',
+        background: 'linear-gradient(135deg, #0d1b2a 0%, #1b263b 100%)',
+        color: '#e0e1dd',
         padding: '1rem',
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>
-          🌍 AirAware + CleanMap
+          AirAware + CleanMap
         </h1>
         
         {/* Search Bar */}
@@ -308,7 +307,7 @@ function App() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="🔍 Search for a city..."
+              placeholder="Search for a city..."
               style={{
                 width: '100%',
                 padding: '0.75rem 2.5rem 0.75rem 1rem',
@@ -329,7 +328,7 @@ function App() {
                 transform: 'translateY(-50%)',
                 fontSize: '1.2rem'
               }}>
-                ⏳
+                ...
               </div>
             )}
           </div>
@@ -341,7 +340,8 @@ function App() {
               top: '100%',
               left: 0,
               right: 0,
-              background: 'white',
+              background: '#1b263b',
+              color: '#e0e1dd',
               borderRadius: '0.5rem',
               marginTop: '0.5rem',
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
@@ -356,14 +356,14 @@ function App() {
                   style={{
                     padding: '0.75rem 1rem',
                     cursor: 'pointer',
-                    borderBottom: index < searchResults.length - 1 ? '1px solid #e5e7eb' : 'none',
-                    color: '#374151',
+                    borderBottom: index < searchResults.length - 1 ? '1px solid #415a77' : 'none',
+                    color: '#e0e1dd',
                     transition: 'background 0.2s'
                   }}
-                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
-                  onMouseLeave={(e) => e.target.style.background = 'white'}
+                  onMouseEnter={(e) => e.target.style.background = '#415a77'}
+                  onMouseLeave={(e) => e.target.style.background = '#1b263b'}
                 >
-                  <div style={{ fontWeight: '500' }}>📍 {result.name}</div>
+                  <div style={{ fontWeight: '500' }}>{result.name}</div>
                   <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
                     {result.lat.toFixed(4)}, {result.lon.toFixed(4)}
                   </div>
@@ -378,12 +378,12 @@ function App() {
               top: '100%',
               left: 0,
               right: 0,
-              background: 'white',
+              background: '#1b263b',
               borderRadius: '0.5rem',
               marginTop: '0.5rem',
               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               padding: '1rem',
-              color: '#6b7280',
+              color: '#778da9',
               textAlign: 'center',
               zIndex: 1000
             }}>
@@ -400,7 +400,7 @@ function App() {
           alignItems: 'center'
         }}>
           <div>
-            {loading && <span>⏳ Loading...</span>}
+            {loading && <span>Loading...</span>}
             {!loading && lastUpdate && (
               <span>Last updated: {lastUpdate.toLocaleTimeString()}</span>
             )}
@@ -412,8 +412,8 @@ function App() {
               disabled={loading}
               style={{
                 padding: '0.5rem 1rem',
-                background: 'rgba(255, 255, 255, 0.9)',
-                color: '#667eea',
+                background: '#415a77',
+                color: '#e0e1dd',
                 border: 'none',
                 borderRadius: '0.25rem',
                 cursor: loading ? 'not-allowed' : 'pointer',
@@ -421,7 +421,7 @@ function App() {
                 fontWeight: '500'
               }}
             >
-              📍 My Location
+              My Location
             </button>
             
             <button
@@ -429,8 +429,8 @@ function App() {
               disabled={loading || !userLocation}
               style={{
                 padding: '0.5rem 1rem',
-                background: 'white',
-                color: '#667eea',
+                background: '#778da9',
+                color: '#0d1b2a',
                 border: 'none',
                 borderRadius: '0.25rem',
                 cursor: loading ? 'not-allowed' : 'pointer',
@@ -438,14 +438,14 @@ function App() {
                 fontWeight: '500'
               }}
             >
-              🔄 Refresh
+              Refresh
             </button>
           </div>
         </div>
         
         {/* Auto-refresh indicator */}
         <div style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.8 }}>
-          ⏰ Auto-refreshes every 5 minutes
+          Auto-refreshes every 5 minutes
         </div>
         
         {/* Error message */}
@@ -456,7 +456,7 @@ function App() {
             marginTop: '0.5rem',
             borderRadius: '0.25rem'
           }}>
-            ⚠️ {error}
+            {error}
           </div>
         )}
       </div>
@@ -485,16 +485,16 @@ function App() {
             >
               {/* Popup with air quality and weather data */}
               <Popup>
-                <div style={{ minWidth: '200px' }}>
-                  <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem' }}>
-                    📍 {airQualityData?.city || 'Loading...'}
+                <div style={{ minWidth: '200px', background: '#1b263b', color: '#e0e1dd', padding: '10px', borderRadius: '8px' }}>
+                  <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#e0e1dd' }}>
+                    {airQualityData?.city || 'Loading...'}
                   </h3>
                   
                   {airQualityData ? (
                     <>
                       {/* Air Quality Section */}
                       <div style={{ marginBottom: '10px' }}>
-                        <strong>🌫️ Air Quality</strong>
+                        <strong>Air Quality</strong>
                         <div style={{ marginLeft: '10px', fontSize: '0.9rem' }}>
                           <div>AQI: <strong>{airQualityData.aqi || 'N/A'}</strong> ({airQualityData.category})</div>
                           <div>PM2.5: {airQualityData.pm25 || 'N/A'} μg/m³</div>
@@ -503,7 +503,7 @@ function App() {
                       
                       {/* Weather Section */}
                       <div>
-                        <strong>☁️ Weather</strong>
+                        <strong>Weather</strong>
                         <div style={{ marginLeft: '10px', fontSize: '0.9rem' }}>
                           <div>Temp: {airQualityData.temperature || 'N/A'}°C</div>
                           <div>Humidity: {airQualityData.humidity || 'N/A'}%</div>
@@ -524,7 +524,7 @@ function App() {
             alignItems: 'center', 
             height: '100%' 
           }}>
-            <div>📍 Getting your location...</div>
+            <div>Getting your location...</div>
           </div>
         )}
       </div>
@@ -534,7 +534,8 @@ function App() {
         position: 'absolute',
         bottom: '20px',
         right: '20px',
-        background: 'white',
+        background: '#1b263b',
+        color: '#e0e1dd',
         padding: '10px',
         borderRadius: '8px',
         boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
@@ -542,10 +543,22 @@ function App() {
       }}>
         <strong>AQI Scale</strong>
         <div style={{ fontSize: '0.8rem', marginTop: '5px' }}>
-          <div>🟢 Good (0-50)</div>
-          <div>🟡 Moderate (51-100)</div>
-          <div>🟠 Unhealthy for Sensitive (101-150)</div>
-          <div>🔴 Unhealthy (151-200)</div>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+            <div style={{ width: '12px', height: '12px', backgroundColor: '#00e400', borderRadius: '50%', marginRight: '8px' }}></div>
+            Good (0-50)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+            <div style={{ width: '12px', height: '12px', backgroundColor: '#ffff00', borderRadius: '50%', marginRight: '8px' }}></div>
+            Moderate (51-100)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+            <div style={{ width: '12px', height: '12px', backgroundColor: '#ff7e00', borderRadius: '50%', marginRight: '8px' }}></div>
+            Unhealthy for Sensitive (101-150)
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: '2px' }}>
+            <div style={{ width: '12px', height: '12px', backgroundColor: '#ff0000', borderRadius: '50%', marginRight: '8px' }}></div>
+            Unhealthy (151-200)
+          </div>
         </div>
       </div>
     </div>
