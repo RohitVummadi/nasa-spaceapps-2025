@@ -10,6 +10,7 @@ from flask_cors import CORS  # This handles Cross-Origin requests from React
 import requests  # For making HTTP requests to external APIs
 import os
 from dotenv import load_dotenv  # For loading environment variables safely
+from firms import firms_bp  # Import FIRMS blueprint
 
 # Load environment variables from .env file (if it exists)
 load_dotenv()
@@ -20,6 +21,9 @@ app = Flask(__name__)
 # Enable CORS to allow our React app (running on port 5173) to talk to this Flask server
 # Without CORS, the browser would block requests between different ports
 CORS(app, origins=['http://localhost:5173', 'http://localhost:3000', '*'])
+
+# Register FIRMS blueprint for wildfire data
+app.register_blueprint(firms_bp)
 
 # API Configuration
 # Get your free API key from: https://openweathermap.org/api

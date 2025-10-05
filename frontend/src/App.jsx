@@ -211,6 +211,11 @@ function App() {
   const [isSearching, setIsSearching] = useState(false); // Loading state for search
   const [showResults, setShowResults] = useState(false); // Show/hide search dropdown
   
+  // FIRMS wildfire data state
+  const [fireData, setFireData] = useState(null); // Stores wildfire data
+  const [showFires, setShowFires] = useState(false); // Toggle fire layer visibility
+  const [fireLoading, setFireLoading] = useState(false); // Loading state for fire data
+  
   // useRef to store the interval ID so we can clear it later
   const refreshIntervalRef = useRef(null);
   const searchBoxRef = useRef(null);
@@ -331,6 +336,38 @@ function App() {
   };
 
   /**
+   * Fetch wildfire data from NASA FIRMS
+   */
+  const fetchFireData = async (mapBounds) => {
+    if (!showFires || !mapBounds) return;
+    
+    try {
+      setFireLoading(true);
+      console.log('🔥 Fetching wildfire data...');
+      
+      // Convert map bounds to bbox format (minLon,minLat,maxLon,maxLat)
+      const bbox = `${mapBounds.getWest()},${mapBounds.getSouth()},${mapBounds.getEast()},${mapBounds.getNorth()}`;
+      
+      const response = await fetch(`http://localhost:5001/api/fires?bbox=${bbox}&days=7`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('🔥 Fire data received:', data.features?.length || 0, 'fires');
+      
+      setFireData(data);
+      
+    } catch (err) {
+      console.error('❌ Error fetching fire data:', err);
+      setError(`Failed to load wildfire data: ${err.message}`);
+    } finally {
+      setFireLoading(false);
+    }
+  };
+
+  /**
    * Get the user's current location using the browser's Geolocation API
    */
   const getUserLocation = () => {
@@ -406,6 +443,31 @@ function App() {
       }
     };
   }, []); // Empty array means this runs once on mount
+
+  /**
+   * Fetch fire data when fire layer is toggled or map bounds change
+   */
+  useEffect(() => {
+    if (showFires && userLocation) {
+      // Get current map bounds (approximate based on zoom level)
+      const zoom = 13; // Default zoom level
+      const lat = userLocation.lat;
+      const lng = userLocation.lng;
+      
+      // Calculate approximate bounds (rough estimation)
+      const latRange = 0.1; // ~11km at this latitude
+      const lngRange = 0.1;
+      
+      const bounds = {
+        getWest: () => lng - lngRange,
+        getEast: () => lng + lngRange,
+        getSouth: () => lat - latRange,
+        getNorth: () => lat + latRange
+      };
+      
+      fetchFireData(bounds);
+    }
+  }, [showFires, userLocation]);
 
   /**
    * Manual refresh button handler
@@ -678,23 +740,6 @@ function App() {
 
       {/* Map Container */}
       <div style={{ flex: 1, position: 'relative' }}>
-        {/* Click instruction */}
-        <div style={{
-          position: 'absolute',
-          top: '10px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'rgba(13, 27, 42, 0.9)',
-          color: '#e0e1dd',
-          padding: '8px 16px',
-          borderRadius: '20px',
-          fontSize: '0.9rem',
-          zIndex: 1000,
-          border: '1px solid #415a77',
-          backdropFilter: 'blur(10px)'
-        }}>
-          Click anywhere on the map to explore air quality data
-        </div>
         {userLocation ? (
           <MapContainer 
             center={[userLocation.lat, userLocation.lng]} 
@@ -822,6 +867,72 @@ function App() {
                 </Popup>
               </Marker>
             )}
+            
+            {/* Fire Markers */}
+            {showFires && fireData && fireData.features && fireData.features.map((fire, index) => {
+              const [lon, lat] = fire.geometry.coordinates;
+              const props = fire.properties;
+              
+              // Style fire marker based on confidence
+              const getFireIcon = (confidence) => {
+                let color = '#ff4444'; // Default red
+                let size = 12;
+                
+                if (confidence === 'high') {
+                  color = '#ff0000';
+                  size = 16;
+                } else if (confidence === 'medium') {
+                  color = '#ff6666';
+                  size = 14;
+                } else if (confidence === 'low') {
+                  color = '#ff9999';
+                  size = 10;
+                }
+                
+                return L.divIcon({
+                  html: `<div style="
+                    background-color: ${color};
+                    width: ${size}px;
+                    height: ${size}px;
+                    border-radius: 50%;
+                    box-shadow: 0 0 8px rgba(255, 68, 68, 0.8);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                  "></div>`,
+                  className: 'fire-marker',
+                  iconSize: [size, size],
+                  iconAnchor: [size/2, size/2]
+                });
+              };
+              
+              return (
+                <Marker
+                  key={`fire-${index}`}
+                  position={[lat, lon]}
+                  icon={getFireIcon(props.confidence)}
+                >
+                  <Popup>
+                    <div style={{ minWidth: '200px' }}>
+                      <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#e0e1dd' }}>
+                        Active Fire
+                      </h3>
+                      
+                      <div style={{ fontSize: '0.9rem' }}>
+                        <div><strong>Confidence:</strong> {props.confidence || 'Unknown'}</div>
+                        <div><strong>Brightness:</strong> {props.brightness || 'N/A'} K</div>
+                        <div><strong>Fire Radiative Power:</strong> {props.frp || 'N/A'} MW</div>
+                        <div><strong>Date:</strong> {props.acq_date || 'N/A'}</div>
+                        <div><strong>Time:</strong> {props.acq_time || 'N/A'}</div>
+                        <div><strong>Satellite:</strong> {props.satellite || 'N/A'}</div>
+                        <div><strong>Instrument:</strong> {props.instrument || 'N/A'}</div>
+                        <div><strong>Day/Night:</strong> {props.daynight || 'N/A'}</div>
+                      </div>
+                    </div>
+                  </Popup>
+                </Marker>
+              );
+            })}
           </MapContainer>
         ) : (
           <div style={{ 
@@ -883,6 +994,45 @@ function App() {
               {pollutant.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Fire Layer Toggle */}
+      <div style={{
+        position: 'absolute',
+        bottom: '170px',
+        right: '20px',
+        background: '#1b263b',
+        color: '#e0e1dd',
+        padding: '10px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+        zIndex: 1000,
+        minWidth: '150px',
+        textAlign: 'center'
+      }}>
+        <strong>Wildfire Data</strong>
+        <div style={{ marginTop: '8px' }}>
+          <button
+            onClick={() => setShowFires(!showFires)}
+            style={{
+              background: showFires ? '#ff4444' : 'transparent',
+              color: '#e0e1dd',
+              border: '1px solid #ff4444',
+              borderRadius: '4px',
+              padding: '8px 12px',
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              width: '100%',
+              justifyContent: 'center'
+            }}
+          >
+            {showFires ? 'Hide Fires' : 'Show Fires'}
+            {fireLoading && <span style={{ fontSize: '0.7rem' }}>(Loading...)</span>}
+          </button>
         </div>
       </div>
 
