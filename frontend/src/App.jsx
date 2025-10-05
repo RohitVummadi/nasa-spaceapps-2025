@@ -8,6 +8,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import './App.css';
 
 // Fix Leaflet default marker icon issue in React
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -29,9 +30,14 @@ function App() {
   const [loading, setLoading] = useState(true); // Shows loading state
   const [error, setError] = useState(null); // Stores error messages
   const [lastUpdate, setLastUpdate] = useState(null); // Tracks last refresh time
+  const [searchQuery, setSearchQuery] = useState(''); // Stores city search input
+  const [searchResults, setSearchResults] = useState([]); // Stores search results
+  const [isSearching, setIsSearching] = useState(false); // Loading state for search
+  const [showResults, setShowResults] = useState(false); // Show/hide search dropdown
   
   // useRef to store the interval ID so we can clear it later
   const refreshIntervalRef = useRef(null);
+  const searchBoxRef = useRef(null);
 
   /**
    * Create a colored marker icon based on AQI category
@@ -192,6 +198,77 @@ function App() {
     }
   };
 
+  /**
+   * Handle city search
+   */
+  const handleCitySearch = async (query) => {
+    if (!query || query.length < 3) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      // Import the searchCity function
+      const { searchCity } = await import('./utils/api');
+      const results = await searchCity(query);
+      setSearchResults(results);
+      setShowResults(true);
+    } catch (err) {
+      console.error('Search error:', err);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  /**
+   * Handle selecting a city from search results
+   */
+  const handleCitySelect = (result) => {
+    const coords = {
+      lat: result.lat,
+      lng: result.lon
+    };
+    
+    console.log('📍 Selected city:', result.name, coords);
+    setUserLocation(coords);
+    fetchAirQualityData(coords.lat, coords.lng);
+    
+    // Clear search
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowResults(false);
+  };
+
+  /**
+   * Handle search input changes with debouncing
+   */
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery) {
+        handleCitySearch(searchQuery);
+      }
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  /**
+   * Close search results when clicking outside
+   */
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target)) {
+        setShowResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
@@ -205,9 +282,102 @@ function App() {
           🌍 AirAware + CleanMap
         </h1>
         
+        {/* Search Bar */}
+        <div style={{ 
+          marginTop: '1rem', 
+          position: 'relative',
+          maxWidth: '500px'
+        }} ref={searchBoxRef}>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Search for a city..."
+              style={{
+                width: '100%',
+                padding: '0.75rem 2.5rem 0.75rem 1rem',
+                borderRadius: '0.5rem',
+                border: 'none',
+                fontSize: '1rem',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                outline: 'none'
+              }}
+            />
+            {isSearching && (
+              <div style={{
+                position: 'absolute',
+                right: '1rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: '1.2rem'
+              }}>
+                ⏳
+              </div>
+            )}
+          </div>
+          
+          {/* Search Results Dropdown */}
+          {showResults && searchResults.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              background: 'white',
+              borderRadius: '0.5rem',
+              marginTop: '0.5rem',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              maxHeight: '300px',
+              overflowY: 'auto',
+              zIndex: 1000
+            }}>
+              {searchResults.map((result, index) => (
+                <div
+                  key={index}
+                  onClick={() => handleCitySelect(result)}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    cursor: 'pointer',
+                    borderBottom: index < searchResults.length - 1 ? '1px solid #e5e7eb' : 'none',
+                    color: '#374151',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+                  onMouseLeave={(e) => e.target.style.background = 'white'}
+                >
+                  <div style={{ fontWeight: '500' }}>📍 {result.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                    {result.lat.toFixed(4)}, {result.lon.toFixed(4)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {showResults && searchResults.length === 0 && searchQuery.length >= 3 && !isSearching && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              background: 'white',
+              borderRadius: '0.5rem',
+              marginTop: '0.5rem',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              padding: '1rem',
+              color: '#6b7280',
+              textAlign: 'center',
+              zIndex: 1000
+            }}>
+              No cities found. Try a different search.
+            </div>
+          )}
+        </div>
+        
         {/* Status and controls */}
         <div style={{ 
-          marginTop: '0.5rem', 
+          marginTop: '0.75rem', 
           display: 'flex', 
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -219,21 +389,41 @@ function App() {
             )}
           </div>
           
-          <button
-            onClick={handleManualRefresh}
-            disabled={loading || !userLocation}
-            style={{
-              padding: '0.5rem 1rem',
-              background: 'white',
-              color: '#667eea',
-              border: 'none',
-              borderRadius: '0.25rem',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.5 : 1
-            }}
-          >
-            🔄 Refresh Now
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={getUserLocation}
+              disabled={loading}
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'rgba(255, 255, 255, 0.9)',
+                color: '#667eea',
+                border: 'none',
+                borderRadius: '0.25rem',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.5 : 1,
+                fontWeight: '500'
+              }}
+            >
+              📍 My Location
+            </button>
+            
+            <button
+              onClick={handleManualRefresh}
+              disabled={loading || !userLocation}
+              style={{
+                padding: '0.5rem 1rem',
+                background: 'white',
+                color: '#667eea',
+                border: 'none',
+                borderRadius: '0.25rem',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.5 : 1,
+                fontWeight: '500'
+              }}
+            >
+              🔄 Refresh
+            </button>
+          </div>
         </div>
         
         {/* Auto-refresh indicator */}

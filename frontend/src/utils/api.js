@@ -48,6 +48,30 @@ export const getUserLocation = () => {
   });
 };
 
+// Geocoding function to search for cities
+export const searchCity = async (cityName) => {
+  try {
+    // Using Nominatim (OpenStreetMap) geocoding API - free and no API key needed
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityName)}&format=json&limit=5`
+    );
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+    
+    // Transform the results to a more user-friendly format
+    return data.map(result => ({
+      name: result.display_name,
+      lat: parseFloat(result.lat),
+      lon: parseFloat(result.lon),
+      type: result.type,
+      importance: result.importance
+    }));
+  } catch (error) {
+    console.error('Error searching for city:', error);
+    throw error;
+  }
+};
+
 // Mock forecast data generator (replace with real API later)
 export const generateMockForecast = (currentAQI) => {
   const hours = [];
