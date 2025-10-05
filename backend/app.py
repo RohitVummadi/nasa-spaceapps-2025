@@ -143,65 +143,26 @@ def get_air_quality():
             print(f"❌ Error fetching weather: {str(e)}")
             # Continue even if weather fails - we might still get air quality
         
-        # Step 3: Fetch Air Quality Data from OpenAQ
+        # Step 3: Fetch Comprehensive Air Quality Data
         try:
-            print("🌫️ Fetching air quality data...")
+            print("🌫️ Fetching comprehensive air quality data...")
             
-            # OpenAQ requires a search radius (in meters)
-            # We'll search within 25km of the coordinates
-            openaq_params = {
-                'coordinates': f"{lat},{lon}",
-                'radius': 25000,  # 25 km radius
-                'limit': 1,  # Get just the nearest station
-                'parameter': 'pm25'  # We want PM2.5 data
-            }
+            # Get comprehensive pollutant data
+            pollutant_data = fetch_comprehensive_air_quality(lat, lon)
             
-            # Make the API call
-            air_response = requests.get(
-                OPENAQ_API_URL,
-                params=openaq_params,
-                timeout=5
-            )
+            # Update response with real pollutant data
+            response_data['aqi'] = pollutant_data['aqi']
+            response_data['pm25'] = pollutant_data['pm25']
+            response_data['category'] = pollutant_data['category']
             
-            if air_response.status_code == 200:
-                air_data = air_response.json()
-                
-                # Check if we got any results
-                if air_data.get('results') and len(air_data['results']) > 0:
-                    result = air_data['results'][0]
-                    
-                    # Look for PM2.5 measurement
-                    measurements = result.get('measurements', [])
-                    for measurement in measurements:
-                        if measurement.get('parameter') == 'pm25':
-                            pm25_value = measurement.get('value', 0)
-                            
-                            # Store PM2.5 and calculate AQI
-                            response_data['pm25'] = round(pm25_value, 1)
-                            response_data['aqi'] = calculate_aqi_from_pm25(pm25_value)
-                            response_data['category'] = get_aqi_category(response_data['aqi'])
-                            
-                            print(f"✅ Air quality data found: AQI={response_data['aqi']}")
-                            break
-                else:
-                    print("⚠️ No air quality stations found nearby")
-                    # Use demo data if no stations found
-                    response_data['pm25'] = 15.0
-                    response_data['aqi'] = 55
-                    response_data['category'] = "Moderate (Demo Data)"
-            else:
-                print(f"⚠️ OpenAQ API error: {air_response.status_code}")
-                # Use demo data if API fails
-                response_data['pm25'] = 10.0
-                response_data['aqi'] = 42
-                response_data['category'] = "Good (Demo Data)"
-                
+            print(f"📊 Returning combined data: {response_data}")
+            
         except Exception as e:
-            print(f"❌ Error fetching air quality: {str(e)}")
-            # Provide demo data if there's an error
-            response_data['pm25'] = 12.0
-            response_data['aqi'] = 50
-            response_data['category'] = "Good (Demo Data)"
+            print(f"⚠️ Air quality data error: {e}")
+            # Use demo air quality data if API fails
+            response_data['aqi'] = 42
+            response_data['pm25'] = 10.0
+            response_data['category'] = 'Good (Demo Data)'
         
         # Step 4: Return the combined data
         print(f"📊 Returning combined data: {response_data}")

@@ -51,12 +51,40 @@ const createPollutantOverlay = (lat, lon, pollutantData, activeLayer) => {
 
   const overlays = [];
 
-  // Create concentric circles for different pollutant levels
-  const pollutantLevels = [
-    { radius: 0.01, opacity: 0.8, intensity: 'high' },
-    { radius: 0.02, opacity: 0.6, intensity: 'medium' },
-    { radius: 0.03, opacity: 0.4, intensity: 'low' }
-  ];
+  // Calculate dynamic radius based on pollutant intensity
+  const getDynamicRadius = (layer, value) => {
+    if (!value || value === 0) return { base: 0.005, high: 0.01, medium: 0.015, low: 0.02 };
+    
+    // Define thresholds for each pollutant
+    const thresholds = {
+      pm25: { low: 12, medium: 35, high: 55 },
+      no2: { low: 40, medium: 80, high: 180 },
+      o3: { low: 100, medium: 160, high: 240 },
+      so2: { low: 20, medium: 80, high: 250 },
+      co: { low: 4, medium: 9, high: 15 }
+    };
+    
+    const threshold = thresholds[layer] || thresholds.pm25;
+    
+    // Calculate intensity multiplier (0.5 to 3.0)
+    let intensityMultiplier = 0.5;
+    if (value <= threshold.low) {
+      intensityMultiplier = 0.5 + (value / threshold.low) * 0.5; // 0.5 to 1.0
+    } else if (value <= threshold.medium) {
+      intensityMultiplier = 1.0 + ((value - threshold.low) / (threshold.medium - threshold.low)) * 1.0; // 1.0 to 2.0
+    } else if (value <= threshold.high) {
+      intensityMultiplier = 2.0 + ((value - threshold.medium) / (threshold.high - threshold.medium)) * 1.0; // 2.0 to 3.0
+    } else {
+      intensityMultiplier = 3.0; // Maximum intensity
+    }
+    
+    return {
+      base: 0.005 * intensityMultiplier,
+      high: 0.01 * intensityMultiplier,
+      medium: 0.015 * intensityMultiplier,
+      low: 0.02 * intensityMultiplier
+    };
+  };
 
   // Get color based on active layer and pollutant value
   const getPollutantColor = (layer, value) => {
@@ -95,6 +123,15 @@ const createPollutantOverlay = (lat, lon, pollutantData, activeLayer) => {
   };
 
   const pollutantValue = pollutantData[activeLayer] || 0;
+  const radii = getDynamicRadius(activeLayer, pollutantValue);
+  
+  // Create concentric circles with dynamic radii
+  const pollutantLevels = [
+    { radius: radii.high, opacity: 0.8, intensity: 'high' },
+    { radius: radii.medium, opacity: 0.6, intensity: 'medium' },
+    { radius: radii.low, opacity: 0.4, intensity: 'low' }
+  ];
+
   const color = getPollutantColor(activeLayer, pollutantValue);
   
   console.log(`Pollutant value: ${pollutantValue}, Color: ${color}`);
@@ -112,6 +149,18 @@ const createPollutantOverlay = (lat, lon, pollutantData, activeLayer) => {
 
     overlays.push(circle);
   });
+
+  // Add a center dot to show the exact location
+  const centerDot = L.circleMarker([lat, lon], {
+    radius: 8,
+    color: color,
+    fillColor: color,
+    fillOpacity: 0.9,
+    weight: 2,
+    className: `pollutant-center-${activeLayer}`
+  });
+
+  overlays.push(centerDot);
 
   console.log(`Created ${overlays.length} overlay circles`);
   return overlays;
@@ -133,7 +182,7 @@ function PollutantOverlay({ userLocation, pollutantData, activeLayer }) {
     
     // Clear existing overlays
     map.eachLayer(layer => {
-      if (layer.options.className && layer.options.className.includes('pollutant-overlay')) {
+      if (layer.options.className && (layer.options.className.includes('pollutant-overlay') || layer.options.className.includes('pollutant-center'))) {
         map.removeLayer(layer);
       }
     });
@@ -148,7 +197,7 @@ function PollutantOverlay({ userLocation, pollutantData, activeLayer }) {
     // Cleanup function
     return () => {
       map.eachLayer(layer => {
-        if (layer.options.className && layer.options.className.includes('pollutant-overlay')) {
+        if (layer.options.className && (layer.options.className.includes('pollutant-overlay') || layer.options.className.includes('pollutant-center'))) {
           map.removeLayer(layer);
         }
       });
@@ -451,7 +500,7 @@ function App() {
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.5rem' }}>
-          AirAware + CleanMap
+          AirAware
         </h1>
         
         {/* Search Bar */}
