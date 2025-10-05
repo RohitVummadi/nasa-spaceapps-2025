@@ -194,4 +194,48 @@
   color: #6b7280;
 }
 
+/* Tesla Map Styling - Clean Dark Theme */
+/* Clean Tesla-style dark map with bright white city names and light grey roads */
+
+/* Custom Leaflet Popup Styling - Remove White Border */
+.leaflet-popup-content-wrapper {
+  background: #1b263b !important;
+  border: none !important;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.4) !important;
+  border-radius: 8px !important;
+}
+
+.leaflet-popup-content {
+  background: #1b263b !important;
+  color: #e0e1dd !important;
+  margin: 0 !important;
+  padding: 10px !important;
+  border-radius: 8px !important;
+}
+
+.leaflet-popup-tip {
+  background: #1b263b !important;
+  border: none !important;
+}
+
+.leaflet-popup-close-button {
+  background: #1b263b !important;
+  color: #e0e1dd !important;
+  border: none !important;
+  border-radius: 4px !important;
+  width: 20px !important;
+  height: 20px !important;
+  font-size: 16px !important;
+  font-weight: bold !important;
+  right: 5px !important;
+  top: 5px !important;
+  line-height: 1 !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-close-button:hover {
+  background: #415a77 !important;
+  color: #e0e1dd !important;
+}
+
 

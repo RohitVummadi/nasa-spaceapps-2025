@@ -202,6 +202,7 @@ function App() {
   const [pollutantData, setPollutantData] = useState(null); // Stores comprehensive pollutant data
   const [activeLayer, setActiveLayer] = useState('aqi'); // Currently selected pollutant layer
   const [dataAvailability, setDataAvailability] = useState({}); // Tracks data availability for each pollutant
+  const [clickedLocation, setClickedLocation] = useState(null); // Stores clicked location coordinates
   const [loading, setLoading] = useState(true); // Shows loading state
   const [error, setError] = useState(null); // Stores error messages
   const [lastUpdate, setLastUpdate] = useState(null); // Tracks last refresh time
@@ -677,18 +678,51 @@ function App() {
 
       {/* Map Container */}
       <div style={{ flex: 1, position: 'relative' }}>
+        {/* Click instruction */}
+        <div style={{
+          position: 'absolute',
+          top: '10px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(13, 27, 42, 0.9)',
+          color: '#e0e1dd',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          fontSize: '0.9rem',
+          zIndex: 1000,
+          border: '1px solid #415a77',
+          backdropFilter: 'blur(10px)'
+        }}>
+          Click anywhere on the map to explore air quality data
+        </div>
         {userLocation ? (
           <MapContainer 
             center={[userLocation.lat, userLocation.lng]} 
             zoom={13} 
             style={{ height: '100%', width: '100%' }}
+            className="custom-map-style"
+            eventHandlers={{
+              click: (e) => {
+                try {
+                  const { lat, lng } = e.latlng;
+                  console.log('🎯 Map clicked at:', lat, lng);
+                  // Store clicked location and fetch data
+                  setClickedLocation({ lat, lng });
+                  fetchAirQualityData(lat, lng);
+                  fetchPollutantData(lat, lng);
+                  console.log('✅ Click handler executed successfully');
+                } catch (error) {
+                  console.error('❌ Error handling map click:', error);
+                }
+              }
+            }}
           >
             {/* Component to update map view when location changes */}
             <MapUpdater center={[userLocation.lat, userLocation.lng]} zoom={13} />
             
             {/* OpenStreetMap tiles */}
             <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
             
@@ -708,7 +742,7 @@ function App() {
             >
               {/* Popup with air quality and weather data */}
               <Popup>
-                <div style={{ minWidth: '200px', background: '#1b263b', color: '#e0e1dd', padding: '10px', borderRadius: '8px' }}>
+                <div style={{ minWidth: '200px' }}>
                   <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#e0e1dd' }}>
                     {airQualityData?.city || 'Loading...'}
                   </h3>
@@ -718,7 +752,7 @@ function App() {
                       {/* Air Quality Section */}
                       <div style={{ marginBottom: '10px' }}>
                         <strong>Air Quality</strong>
-                        <div style={{ marginLeft: '10px', fontSize: '0.9rem' }}>
+                        <div style={{ fontSize: '0.9rem' }}>
                           <div>AQI: <strong>{airQualityData.aqi || 'N/A'}</strong> ({airQualityData.category})</div>
                           <div>PM2.5: {airQualityData.pm25 || 'N/A'} μg/m³</div>
                         </div>
@@ -728,7 +762,7 @@ function App() {
                       {pollutantData && (
                         <div style={{ marginBottom: '10px' }}>
                           <strong>Pollutants</strong>
-                          <div style={{ marginLeft: '10px', fontSize: '0.8rem' }}>
+                          <div style={{ fontSize: '0.8rem' }}>
                             <div>PM2.5: <strong>{pollutantData.pm25 || 'N/A'}</strong> μg/m³</div>
                             <div>PM10: <strong>{pollutantData.pm10 || 'N/A'}</strong> μg/m³</div>
                             <div>NO₂: <strong>{pollutantData.no2 || 'N/A'}</strong> μg/m³</div>
@@ -742,7 +776,7 @@ function App() {
                       {/* Weather Section */}
                       <div>
                         <strong>Weather</strong>
-                        <div style={{ marginLeft: '10px', fontSize: '0.9rem' }}>
+                        <div style={{ fontSize: '0.9rem' }}>
                           <div>Temp: {airQualityData.temperature || 'N/A'}°C</div>
                           <div>Humidity: {airQualityData.humidity || 'N/A'}%</div>
                         </div>
@@ -754,6 +788,40 @@ function App() {
                 </div>
               </Popup>
             </Marker>
+            
+            {/* Marker for clicked location */}
+            {clickedLocation && (
+              <Marker 
+                position={[clickedLocation.lat, clickedLocation.lng]}
+                icon={L.divIcon({
+                  html: `<div style="
+                    width: 20px; 
+                    height: 20px; 
+                    background: #ff6b6b; 
+                    border: 3px solid #ffffff; 
+                    border-radius: 50%; 
+                    box-shadow: 0 0 10px rgba(255, 107, 107, 0.5);
+                  "></div>`,
+                  className: 'custom-clicked-marker',
+                  iconSize: [20, 20],
+                  iconAnchor: [10, 10]
+                })}
+              >
+                <Popup>
+                  <div style={{ minWidth: '200px' }}>
+                    <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: '#e0e1dd' }}>
+                      Clicked Location
+                    </h3>
+                    <p style={{ margin: '5px 0', fontSize: '0.9rem' }}>
+                      <strong>Coordinates:</strong> {clickedLocation.lat.toFixed(4)}, {clickedLocation.lng.toFixed(4)}
+                    </p>
+                    <p style={{ margin: '5px 0', fontSize: '0.9rem', color: '#778da9' }}>
+                      Air quality data loading...
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
           </MapContainer>
         ) : (
           <div style={{ 
