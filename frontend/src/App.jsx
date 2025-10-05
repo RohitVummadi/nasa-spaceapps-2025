@@ -39,10 +39,11 @@ function MapUpdater({ center, zoom }) {
 }
 
 /**
- * Create pollutant overlay circles around the user location
+ * Create pollutant overlay with large base area and "acne-like" high pollution spots
+ * Like spots on a face where pollution is highest
  */
-const createPollutantOverlay = (lat, lon, pollutantData, activeLayer) => {
-  console.log('createPollutantOverlay called with:', { lat, lon, pollutantData, activeLayer });
+const createPollutantHeatMap = (lat, lon, pollutantData, activeLayer) => {
+  console.log('createPollutantHeatMap called with:', { lat, lon, pollutantData, activeLayer });
   
   if (!pollutantData) {
     console.log('No pollutant data provided');
@@ -50,119 +51,106 @@ const createPollutantOverlay = (lat, lon, pollutantData, activeLayer) => {
   }
 
   const overlays = [];
-
-  // Calculate dynamic radius based on pollutant intensity
-  const getDynamicRadius = (layer, value) => {
-    if (!value || value === 0) return { base: 0.005, high: 0.01, medium: 0.015, low: 0.02 };
-    
-    // Define thresholds for each pollutant
-    const thresholds = {
-      pm25: { low: 12, medium: 35, high: 55 },
-      no2: { low: 40, medium: 80, high: 180 },
-      o3: { low: 100, medium: 160, high: 240 },
-      so2: { low: 20, medium: 80, high: 250 },
-      co: { low: 4, medium: 9, high: 15 }
+  const baseValue = pollutantData[activeLayer] || 0;
+  
+  // Get pollutant-specific colors that match the button colors
+  const getPollutantColor = (layer) => {
+    const colors = {
+      pm25: '#ff6b6b', // red
+      pm10: '#ffa726', // orange  
+      no2: '#42a5f5',  // blue
+      o3: '#66bb6a',   // green
+      so2: '#ab47bc',  // purple
+      co: '#8d6e63'    // brown
     };
-    
-    const threshold = thresholds[layer] || thresholds.pm25;
-    
-    // Calculate intensity multiplier (0.5 to 3.0)
-    let intensityMultiplier = 0.5;
-    if (value <= threshold.low) {
-      intensityMultiplier = 0.5 + (value / threshold.low) * 0.5; // 0.5 to 1.0
-    } else if (value <= threshold.medium) {
-      intensityMultiplier = 1.0 + ((value - threshold.low) / (threshold.medium - threshold.low)) * 1.0; // 1.0 to 2.0
-    } else if (value <= threshold.high) {
-      intensityMultiplier = 2.0 + ((value - threshold.medium) / (threshold.high - threshold.medium)) * 1.0; // 2.0 to 3.0
-    } else {
-      intensityMultiplier = 3.0; // Maximum intensity
-    }
-    
-    return {
-      base: 0.005 * intensityMultiplier,
-      high: 0.01 * intensityMultiplier,
-      medium: 0.015 * intensityMultiplier,
-      low: 0.02 * intensityMultiplier
-    };
+    return colors[layer] || '#778da9';
   };
 
-  // Get color based on active layer and pollutant value
-  const getPollutantColor = (layer, value) => {
-    console.log(`Getting color for ${layer}: ${value}`);
-    if (!value || value === 0) return '#778da9'; // Default gray
-    
-    switch (layer) {
-      case 'pm25':
-        if (value <= 12) return '#00e400';
-        if (value <= 35) return '#ffff00';
-        if (value <= 55) return '#ff7e00';
-        return '#ff0000';
-      case 'no2':
-        if (value <= 40) return '#00e400';
-        if (value <= 80) return '#ffff00';
-        if (value <= 180) return '#ff7e00';
-        return '#ff0000';
-      case 'o3':
-        if (value <= 100) return '#00e400';
-        if (value <= 160) return '#ffff00';
-        if (value <= 240) return '#ff7e00';
-        return '#ff0000';
-      case 'so2':
-        if (value <= 20) return '#00e400';
-        if (value <= 80) return '#ffff00';
-        if (value <= 250) return '#ff7e00';
-        return '#ff0000';
-      case 'co':
-        if (value <= 4) return '#00e400';
-        if (value <= 9) return '#ffff00';
-        if (value <= 15) return '#ff7e00';
-        return '#ff0000';
-      default:
-        return '#778da9';
-    }
-  };
-
-  const pollutantValue = pollutantData[activeLayer] || 0;
-  const radii = getDynamicRadius(activeLayer, pollutantValue);
+  const baseColor = getPollutantColor(activeLayer);
   
-  // Create concentric circles with dynamic radii
-  const pollutantLevels = [
-    { radius: radii.high, opacity: 0.8, intensity: 'high' },
-    { radius: radii.medium, opacity: 0.6, intensity: 'medium' },
-    { radius: radii.low, opacity: 0.4, intensity: 'low' }
-  ];
-
-  const color = getPollutantColor(activeLayer, pollutantValue);
-  
-  console.log(`Pollutant value: ${pollutantValue}, Color: ${color}`);
-
-  // Create circles for each intensity level
-  pollutantLevels.forEach(level => {
-    const circle = L.circle([lat, lon], {
-      radius: level.radius * 111000, // Convert to meters
-      color: color,
-      fillColor: color,
-      fillOpacity: level.opacity,
-      weight: 2,
-      className: `pollutant-overlay-${activeLayer}`
-    });
-
-    overlays.push(circle);
+  // Create a large base area (like the face)
+  const baseRadius = 0.05; // degrees (about 5.5km radius)
+  const baseCircle = L.circle([lat, lon], {
+    radius: baseRadius * 111000, // Convert to meters
+    color: baseColor,
+    fillColor: baseColor,
+    fillOpacity: 0.3, // Light base opacity
+    weight: 2,
+    className: `pollutant-base-${activeLayer}`
   });
+  overlays.push(baseCircle);
 
-  // Add a center dot to show the exact location
-  const centerDot = L.circleMarker([lat, lon], {
+  // Define thresholds for each pollutant to determine "acne" spots
+  const thresholds = {
+    pm25: { low: 12, medium: 35, high: 55 },
+    no2: { low: 40, medium: 80, high: 180 },
+    o3: { low: 100, medium: 160, high: 240 },
+    so2: { low: 20, medium: 80, high: 250 },
+    co: { low: 4, medium: 9, high: 15 }
+  };
+  
+  const threshold = thresholds[activeLayer] || thresholds.pm25;
+  
+  // Determine number of "acne" spots based on pollution level (deterministic)
+  const spotSeed = Math.floor(lat * 1000) + Math.floor(lon * 1000) + activeLayer.charCodeAt(0);
+  const seededRandom = (index) => {
+    const x = Math.sin(spotSeed + index) * 10000;
+    return x - Math.floor(x);
+  };
+
+  let numSpots = 0;
+  if (baseValue <= threshold.low) {
+    numSpots = Math.floor(seededRandom(0) * 3); // 0-2 spots
+  } else if (baseValue <= threshold.medium) {
+    numSpots = 3 + Math.floor(seededRandom(1) * 4); // 3-6 spots
+  } else if (baseValue <= threshold.high) {
+    numSpots = 6 + Math.floor(seededRandom(2) * 4); // 6-9 spots
+  } else {
+    numSpots = 8 + Math.floor(seededRandom(3) * 5); // 8-12 spots
+  }
+
+  // Create "acne" spots (smaller circles for high pollution areas)
+  // Use deterministic positioning based on pollutant type and location for consistency
+  for (let i = 0; i < numSpots; i++) {
+    // Deterministic position within the base area
+    const angle = seededRandom(i) * 2 * Math.PI;
+    const distance = seededRandom(i + 100) * baseRadius * 0.8; // Within 80% of base radius
+    
+    const spotLat = lat + Math.cos(angle) * distance;
+    const spotLon = lon + Math.sin(angle) * distance;
+    
+    // Deterministic spot size (like different sized acne)
+    const spotRadius = (0.002 + seededRandom(i + 200) * 0.008) * 111000; // 200m to 1km
+    
+    // Intensity-based opacity (darker spots = higher pollution)
+    const intensity = Math.min(1, baseValue / threshold.high);
+    const opacity = 0.4 + intensity * 0.5; // 0.4 to 0.9 opacity
+    
+    const spot = L.circle([spotLat, spotLon], {
+      radius: spotRadius,
+      color: baseColor,
+      fillColor: baseColor,
+      fillOpacity: opacity,
+      weight: 1,
+      className: `pollutant-spot-${activeLayer}`
+    });
+    
+    overlays.push(spot);
+  }
+
+  // Add a center marker to show exact location
+  const centerMarker = L.circleMarker([lat, lon], {
     radius: 8,
-    color: color,
-    fillColor: color,
+    color: '#ffffff',
+    fillColor: '#ffffff',
     fillOpacity: 0.9,
     weight: 2,
     className: `pollutant-center-${activeLayer}`
   });
 
-  overlays.push(centerDot);
+  overlays.push(centerMarker);
 
-  console.log(`Created ${overlays.length} overlay circles`);
+  console.log(`Created base area + ${numSpots} pollution spots for ${activeLayer}`);
   return overlays;
 };
 
@@ -182,14 +170,14 @@ function PollutantOverlay({ userLocation, pollutantData, activeLayer }) {
     
     // Clear existing overlays
     map.eachLayer(layer => {
-      if (layer.options.className && (layer.options.className.includes('pollutant-overlay') || layer.options.className.includes('pollutant-center'))) {
+      if (layer.options.className && (layer.options.className.includes('pollutant-base') || layer.options.className.includes('pollutant-spot') || layer.options.className.includes('pollutant-center'))) {
         map.removeLayer(layer);
       }
     });
     
-    // Create new overlays
-    const overlays = createPollutantOverlay(userLocation.lat, userLocation.lng, pollutantData, activeLayer);
-    console.log('PollutantOverlay: Generated overlays', overlays);
+    // Create new heat map overlays
+    const overlays = createPollutantHeatMap(userLocation.lat, userLocation.lng, pollutantData, activeLayer);
+    console.log('PollutantOverlay: Generated heat map overlays', overlays);
     if (overlays) {
       overlays.forEach(overlay => map.addLayer(overlay));
     }
@@ -197,7 +185,7 @@ function PollutantOverlay({ userLocation, pollutantData, activeLayer }) {
     // Cleanup function
     return () => {
       map.eachLayer(layer => {
-        if (layer.options.className && (layer.options.className.includes('pollutant-overlay') || layer.options.className.includes('pollutant-center'))) {
+        if (layer.options.className && (layer.options.className.includes('pollutant-base') || layer.options.className.includes('pollutant-spot') || layer.options.className.includes('pollutant-center'))) {
           map.removeLayer(layer);
         }
       });
@@ -212,6 +200,8 @@ function App() {
   const [userLocation, setUserLocation] = useState(null); // Stores user's coordinates
   const [airQualityData, setAirQualityData] = useState(null); // Stores API response
   const [pollutantData, setPollutantData] = useState(null); // Stores comprehensive pollutant data
+  const [activeLayer, setActiveLayer] = useState('aqi'); // Currently selected pollutant layer
+  const [dataAvailability, setDataAvailability] = useState({}); // Tracks data availability for each pollutant
   const [loading, setLoading] = useState(true); // Shows loading state
   const [error, setError] = useState(null); // Stores error messages
   const [lastUpdate, setLastUpdate] = useState(null); // Tracks last refresh time
@@ -219,7 +209,6 @@ function App() {
   const [searchResults, setSearchResults] = useState([]); // Stores search results
   const [isSearching, setIsSearching] = useState(false); // Loading state for search
   const [showResults, setShowResults] = useState(false); // Show/hide search dropdown
-  const [activeLayer, setActiveLayer] = useState('aqi'); // Active pollutant layer
   
   // useRef to store the interval ID so we can clear it later
   const refreshIntervalRef = useRef(null);
@@ -318,6 +307,18 @@ function App() {
       const data = await response.json();
       console.log('📊 Pollutant data received:', data);
       
+      // Check data availability for each pollutant
+      const availability = {
+        pm25: data.pm25 && data.pm25 > 0,
+        pm10: data.pm10 && data.pm10 > 0,
+        no2: data.no2 && data.no2 > 0,
+        o3: data.o3 && data.o3 > 0,
+        so2: data.so2 && data.so2 > 0,
+        co: data.co && data.co > 0,
+        aqi: data.aqi && data.aqi > 0 // AQI should always be available
+      };
+      
+      setDataAvailability(availability);
       setPollutantData(data);
       return data;
       
@@ -492,6 +493,12 @@ function App() {
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: 'sans-serif' }}>
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       {/* Header */}
       <div style={{
         background: 'linear-gradient(135deg, #0d1b2a 0%, #1b263b 100%)',
@@ -776,7 +783,6 @@ function App() {
         <strong>Pollutant Layers</strong>
         <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {[
-            { key: 'aqi', label: 'Air Quality Index', color: '#778da9' },
             { key: 'pm25', label: 'PM2.5 (μg/m³)', color: '#ff6b6b' },
             { key: 'pm10', label: 'PM10 (μg/m³)', color: '#ffa726' },
             { key: 'no2', label: 'NO₂ (μg/m³)', color: '#42a5f5' },
@@ -811,6 +817,26 @@ function App() {
           ))}
         </div>
       </div>
+
+      {/* Data Availability Notification */}
+      {!dataAvailability[activeLayer] && pollutantData && activeLayer !== 'aqi' && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          right: '20px',
+          background: '#ff6b6b',
+          color: '#ffffff',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          fontSize: '0.8rem',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+          zIndex: 1000,
+          maxWidth: '200px',
+          animation: 'fadeIn 0.3s ease-in'
+        }}>
+          ⚠️ {activeLayer.toUpperCase()} data not available for this location
+        </div>
+      )}
 
       {/* Legend */}
       <div style={{
