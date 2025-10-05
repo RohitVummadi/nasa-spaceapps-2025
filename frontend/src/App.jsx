@@ -38,10 +38,131 @@ function MapUpdater({ center, zoom }) {
   return null;
 }
 
+/**
+ * Create pollutant overlay circles around the user location
+ */
+const createPollutantOverlay = (lat, lon, pollutantData, activeLayer) => {
+  console.log('createPollutantOverlay called with:', { lat, lon, pollutantData, activeLayer });
+  
+  if (!pollutantData) {
+    console.log('No pollutant data provided');
+    return null;
+  }
+
+  const overlays = [];
+
+  // Create concentric circles for different pollutant levels
+  const pollutantLevels = [
+    { radius: 0.01, opacity: 0.8, intensity: 'high' },
+    { radius: 0.02, opacity: 0.6, intensity: 'medium' },
+    { radius: 0.03, opacity: 0.4, intensity: 'low' }
+  ];
+
+  // Get color based on active layer and pollutant value
+  const getPollutantColor = (layer, value) => {
+    console.log(`Getting color for ${layer}: ${value}`);
+    if (!value || value === 0) return '#778da9'; // Default gray
+    
+    switch (layer) {
+      case 'pm25':
+        if (value <= 12) return '#00e400';
+        if (value <= 35) return '#ffff00';
+        if (value <= 55) return '#ff7e00';
+        return '#ff0000';
+      case 'no2':
+        if (value <= 40) return '#00e400';
+        if (value <= 80) return '#ffff00';
+        if (value <= 180) return '#ff7e00';
+        return '#ff0000';
+      case 'o3':
+        if (value <= 100) return '#00e400';
+        if (value <= 160) return '#ffff00';
+        if (value <= 240) return '#ff7e00';
+        return '#ff0000';
+      case 'so2':
+        if (value <= 20) return '#00e400';
+        if (value <= 80) return '#ffff00';
+        if (value <= 250) return '#ff7e00';
+        return '#ff0000';
+      case 'co':
+        if (value <= 4) return '#00e400';
+        if (value <= 9) return '#ffff00';
+        if (value <= 15) return '#ff7e00';
+        return '#ff0000';
+      default:
+        return '#778da9';
+    }
+  };
+
+  const pollutantValue = pollutantData[activeLayer] || 0;
+  const color = getPollutantColor(activeLayer, pollutantValue);
+  
+  console.log(`Pollutant value: ${pollutantValue}, Color: ${color}`);
+
+  // Create circles for each intensity level
+  pollutantLevels.forEach(level => {
+    const circle = L.circle([lat, lon], {
+      radius: level.radius * 111000, // Convert to meters
+      color: color,
+      fillColor: color,
+      fillOpacity: level.opacity,
+      weight: 2,
+      className: `pollutant-overlay-${activeLayer}`
+    });
+
+    overlays.push(circle);
+  });
+
+  console.log(`Created ${overlays.length} overlay circles`);
+  return overlays;
+};
+
+/**
+ * Component to render pollutant overlay circles
+ */
+function PollutantOverlay({ userLocation, pollutantData, activeLayer }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (!userLocation || !pollutantData) {
+      console.log('PollutantOverlay: Missing data', { userLocation, pollutantData });
+      return;
+    }
+    
+    console.log('PollutantOverlay: Creating overlays', { userLocation, pollutantData, activeLayer });
+    
+    // Clear existing overlays
+    map.eachLayer(layer => {
+      if (layer.options.className && layer.options.className.includes('pollutant-overlay')) {
+        map.removeLayer(layer);
+      }
+    });
+    
+    // Create new overlays
+    const overlays = createPollutantOverlay(userLocation.lat, userLocation.lng, pollutantData, activeLayer);
+    console.log('PollutantOverlay: Generated overlays', overlays);
+    if (overlays) {
+      overlays.forEach(overlay => map.addLayer(overlay));
+    }
+    
+    // Cleanup function
+    return () => {
+      map.eachLayer(layer => {
+        if (layer.options.className && layer.options.className.includes('pollutant-overlay')) {
+          map.removeLayer(layer);
+        }
+      });
+    };
+  }, [userLocation, pollutantData, activeLayer, map]);
+  
+  return null;
+}
+
 function App() {
   // State variables to manage our app's data
   const [userLocation, setUserLocation] = useState(null); // Stores user's coordinates
   const [airQualityData, setAirQualityData] = useState(null); // Stores API response
+  const [pollutantData, setPollutantData] = useState(null); // Stores comprehensive pollutant data
   const [loading, setLoading] = useState(true); // Shows loading state
   const [error, setError] = useState(null); // Stores error messages
   const [lastUpdate, setLastUpdate] = useState(null); // Tracks last refresh time
@@ -49,6 +170,7 @@ function App() {
   const [searchResults, setSearchResults] = useState([]); // Stores search results
   const [isSearching, setIsSearching] = useState(false); // Loading state for search
   const [showResults, setShowResults] = useState(false); // Show/hide search dropdown
+  const [activeLayer, setActiveLayer] = useState('aqi'); // Active pollutant layer
   
   // useRef to store the interval ID so we can clear it later
   const refreshIntervalRef = useRef(null);
@@ -132,6 +254,32 @@ function App() {
   };
 
   /**
+   * Fetch comprehensive air quality data for multiple pollutants
+   */
+  const fetchPollutantData = async (lat, lon) => {
+    try {
+      console.log(`🌫️ Fetching comprehensive pollutant data for: ${lat}, ${lon}`);
+      
+      const response = await fetch(`http://localhost:5001/api/pollutants?lat=${lat}&lon=${lon}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📊 Pollutant data received:', data);
+      
+      setPollutantData(data);
+      return data;
+      
+    } catch (err) {
+      console.error('❌ Error fetching pollutant data:', err);
+      setError(`Failed to load pollutant data: ${err.message}`);
+      return null;
+    }
+  };
+
+  /**
    * Get the user's current location using the browser's Geolocation API
    */
   const getUserLocation = () => {
@@ -158,6 +306,8 @@ function App() {
         
         // Now fetch air quality data for this location
         fetchAirQualityData(coords.lat, coords.lng);
+        // Also fetch comprehensive pollutant data
+        fetchPollutantData(coords.lat, coords.lng);
       },
       
       // Error callback - something went wrong
@@ -169,6 +319,8 @@ function App() {
         const defaultCoords = { lat: 33.749, lng: -84.388 };
         setUserLocation(defaultCoords);
         fetchAirQualityData(defaultCoords.lat, defaultCoords.lng);
+        // Also fetch comprehensive pollutant data
+        fetchPollutantData(defaultCoords.lat, defaultCoords.lng);
       }
     );
   };
@@ -190,6 +342,8 @@ function App() {
       // If we have a location, refresh the data
       if (userLocation) {
         fetchAirQualityData(userLocation.lat, userLocation.lng);
+        // Also refresh comprehensive pollutant data
+        fetchPollutantData(userLocation.lat, userLocation.lng);
       }
     }, 300000); // 300,000 ms = 5 minutes
 
@@ -209,6 +363,8 @@ function App() {
     if (userLocation) {
       console.log('🔄 Manual refresh triggered');
       fetchAirQualityData(userLocation.lat, userLocation.lng);
+      // Also refresh comprehensive pollutant data
+      fetchPollutantData(userLocation.lat, userLocation.lng);
     }
   };
 
@@ -249,6 +405,8 @@ function App() {
     console.log('📍 Selected city:', result.name, coords);
     setUserLocation(coords);
     fetchAirQualityData(coords.lat, coords.lng);
+    // Also fetch comprehensive pollutant data
+    fetchPollutantData(coords.lat, coords.lng);
     
     // Clear search
     setSearchQuery('');
@@ -478,6 +636,15 @@ function App() {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             />
             
+            {/* Pollutant Overlay Circles */}
+            {pollutantData && activeLayer !== 'aqi' && (
+              <PollutantOverlay 
+                userLocation={userLocation}
+                pollutantData={pollutantData}
+                activeLayer={activeLayer}
+              />
+            )}
+            
             {/* Marker at user location */}
             <Marker 
               position={[userLocation.lat, userLocation.lng]}
@@ -500,6 +667,21 @@ function App() {
                           <div>PM2.5: {airQualityData.pm25 || 'N/A'} μg/m³</div>
                         </div>
                       </div>
+                      
+                      {/* Comprehensive Pollutant Data */}
+                      {pollutantData && (
+                        <div style={{ marginBottom: '10px' }}>
+                          <strong>Pollutants</strong>
+                          <div style={{ marginLeft: '10px', fontSize: '0.8rem' }}>
+                            <div>PM2.5: <strong>{pollutantData.pm25 || 'N/A'}</strong> μg/m³</div>
+                            <div>PM10: <strong>{pollutantData.pm10 || 'N/A'}</strong> μg/m³</div>
+                            <div>NO₂: <strong>{pollutantData.no2 || 'N/A'}</strong> μg/m³</div>
+                            <div>O₃: <strong>{pollutantData.o3 || 'N/A'}</strong> μg/m³</div>
+                            <div>SO₂: <strong>{pollutantData.so2 || 'N/A'}</strong> μg/m³</div>
+                            <div>CO: <strong>{pollutantData.co || 'N/A'}</strong> mg/m³</div>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Weather Section */}
                       <div>
@@ -527,6 +709,58 @@ function App() {
             <div>Getting your location...</div>
           </div>
         )}
+      </div>
+
+      {/* Pollutant Layer Controls */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '20px',
+        background: '#1b263b',
+        color: '#e0e1dd',
+        padding: '10px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+        zIndex: 1000,
+        minWidth: '200px'
+      }}>
+        <strong>Pollutant Layers</strong>
+        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          {[
+            { key: 'aqi', label: 'Air Quality Index', color: '#778da9' },
+            { key: 'pm25', label: 'PM2.5 (μg/m³)', color: '#ff6b6b' },
+            { key: 'pm10', label: 'PM10 (μg/m³)', color: '#ffa726' },
+            { key: 'no2', label: 'NO₂ (μg/m³)', color: '#42a5f5' },
+            { key: 'o3', label: 'O₃ (μg/m³)', color: '#66bb6a' },
+            { key: 'so2', label: 'SO₂ (μg/m³)', color: '#ab47bc' },
+            { key: 'co', label: 'CO (mg/m³)', color: '#8d6e63' }
+          ].map(pollutant => (
+            <button
+              key={pollutant.key}
+              onClick={() => setActiveLayer(pollutant.key)}
+              style={{
+                background: activeLayer === pollutant.key ? '#415a77' : 'transparent',
+                color: '#e0e1dd',
+                border: `1px solid ${pollutant.color}`,
+                borderRadius: '4px',
+                padding: '6px 8px',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <div style={{
+                width: '8px',
+                height: '8px',
+                backgroundColor: pollutant.color,
+                borderRadius: '50%'
+              }}></div>
+              {pollutant.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Legend */}

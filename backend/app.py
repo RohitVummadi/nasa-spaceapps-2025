@@ -215,6 +215,140 @@ def get_air_quality():
         print(f"❌ Server error: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+@app.route('/api/pollutants', methods=['GET'])
+def get_pollutants():
+    """
+    Get comprehensive air quality data for multiple pollutants
+    URL format: /api/pollutants?lat=33.749&lon=-84.388
+    Returns: JSON object with PM2.5, PM10, NO2, O3, SO2, CO data
+    """
+    try:
+        lat = request.args.get('lat')
+        lon = request.args.get('lon')
+        
+        if not lat or not lon:
+            return jsonify({'error': 'Missing latitude or longitude'}), 400
+        
+        lat = float(lat)
+        lon = float(lon)
+        
+        print(f"🌫️ Fetching comprehensive air quality data for: {lat}, {lon}")
+        
+        # Fetch comprehensive air quality data
+        air_data = fetch_comprehensive_air_quality(lat, lon)
+        
+        return jsonify(air_data), 200
+        
+    except Exception as e:
+        print(f"❌ Error fetching pollutant data: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+def fetch_comprehensive_air_quality(lat, lon):
+    """
+    Fetch comprehensive air quality data from multiple sources
+    Returns data for multiple pollutants: PM2.5, PM10, NO2, O3, SO2, CO
+    """
+    try:
+        # Try AirVisual API first (free tier available)
+        airvisual_data = fetch_airvisual_data(lat, lon)
+        if airvisual_data:
+            return airvisual_data
+        
+        # Fallback to demo data with realistic values based on location
+        return generate_realistic_demo_data(lat, lon)
+        
+    except Exception as e:
+        print(f"Error fetching comprehensive air quality data: {e}")
+        return generate_realistic_demo_data(lat, lon)
+
+def fetch_airvisual_data(lat, lon):
+    """
+    Try to fetch data from AirVisual API (free tier)
+    """
+    try:
+        # AirVisual API endpoint
+        url = "https://api.airvisual.com/v2/nearest_city"
+        
+        params = {
+            'lat': lat,
+            'lon': lon,
+            'key': 'YOUR_AIRVISUAL_API_KEY'  # You would need to get this from AirVisual
+        }
+        
+        # For now, return None to use demo data
+        return None
+        
+    except Exception as e:
+        print(f"AirVisual API error: {e}")
+        return None
+
+def generate_realistic_demo_data(lat, lon):
+    """
+    Generate realistic demo data based on location characteristics
+    """
+    import random
+    
+    # Generate realistic pollutant values based on location
+    # Urban areas tend to have higher pollution
+    is_urban = is_urban_area(lat, lon)
+    
+    if is_urban:
+        # Urban area - higher pollution
+        pm25 = round(random.uniform(15, 45), 1)
+        pm10 = round(random.uniform(25, 65), 1)
+        no2 = round(random.uniform(30, 80), 1)
+        o3 = round(random.uniform(80, 150), 1)
+        so2 = round(random.uniform(10, 40), 1)
+        co = round(random.uniform(2, 8), 1)
+    else:
+        # Rural/suburban area - lower pollution
+        pm25 = round(random.uniform(5, 20), 1)
+        pm10 = round(random.uniform(10, 30), 1)
+        no2 = round(random.uniform(10, 40), 1)
+        o3 = round(random.uniform(50, 100), 1)
+        so2 = round(random.uniform(2, 15), 1)
+        co = round(random.uniform(0.5, 3), 1)
+    
+    # Calculate AQI from PM2.5
+    aqi = calculate_aqi_from_pm25(pm25)
+    
+    return {
+        'pm25': pm25,
+        'pm10': pm10,
+        'no2': no2,
+        'o3': o3,
+        'so2': so2,
+        'co': co,
+        'aqi': aqi,
+        'category': get_aqi_category(aqi),
+        'last_updated': 'Demo Data'
+    }
+
+def is_urban_area(lat, lon):
+    """
+    Simple heuristic to determine if location is urban
+    """
+    # Major US cities (simplified)
+    major_cities = [
+        (40.7128, -74.0060),  # NYC
+        (34.0522, -118.2437), # LA
+        (41.8781, -87.6298),  # Chicago
+        (29.7604, -95.3698),  # Houston
+        (33.4484, -112.0740), # Phoenix
+        (39.9526, -75.1652),  # Philadelphia
+        (32.7767, -96.7970),  # Dallas
+        (29.4241, -98.4936),  # San Antonio
+        (37.7749, -122.4194), # San Francisco
+        (32.7157, -117.1611), # San Diego
+    ]
+    
+    for city_lat, city_lon in major_cities:
+        distance = ((lat - city_lat) ** 2 + (lon - city_lon) ** 2) ** 0.5
+        if distance < 0.5:  # Within ~50km of major city
+            return True
+    
+    return False
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """
