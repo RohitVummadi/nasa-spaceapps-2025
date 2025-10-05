@@ -283,4 +283,4 @@ if __name__ == '__main__':
     # Run the Flask development server
     print("Starting AirAware + CleanMap Backend Server...")
     print("Make sure to set OPENAQ_API_KEY and OPENWEATHER_API_KEY in your .env file")
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001)
